@@ -10,6 +10,6 @@ namespace PaperlessREST.Services.Interface
         public IActionResult GetDocumentById(int id);
         public IActionResult AddDocument(DocumentDto docDto);
         public IActionResult DeleteDocument(int id);
-        public IActionResult UpdateDocument(int id, Document document);
+        public IActionResult UpdateDocument(int id, DocumentDto docDto);
     }
 }

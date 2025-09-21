@@ -1,9 +1,9 @@
-﻿using PaperlessREST.Services.Interface;
+﻿using Microsoft.AspNetCore.Mvc;
+using PaperlessREST.Services.Interface;
+using AutoMapper;
 using PaperlessREST.Data;
 using PaperlessREST.Model;
 using PaperlessREST.DTOs;
-using Microsoft.AspNetCore.Mvc;
-using AutoMapper;
 
 namespace PaperlessREST.Services
 {
@@ -13,6 +13,7 @@ namespace PaperlessREST.Services
     {
         private readonly ApplicationDBContext _context;
         private readonly IMapper _mapper;
+
         public DocumentController(ApplicationDBContext dbContext, IMapper mapper)
         {
             _context = dbContext;
@@ -47,16 +48,34 @@ namespace PaperlessREST.Services
             return CreatedAtAction(nameof(GetDocumentById), new { id = docModel.Id }, _mapper.Map<DocumentDto>(docModel));
         }
 
-        [HttpPut]
-        public IActionResult DeleteDocument(int id)
+        [HttpDelete("{id}")]
+        public IActionResult DeleteDocument([FromRoute] int id)
         {
-            throw new NotImplementedException();
+            var docModel = _context.Documents.FirstOrDefault(x => x.Id == id);
+
+            if (docModel is null) return NotFound();
+
+            _context.Documents.Remove(docModel); 
+            _context.SaveChanges();
+
+            return NoContent();
         }
 
-        [HttpDelete]
-        public IActionResult UpdateDocument(int id, Document document)
+        [HttpPut("{id}")]
+        public IActionResult UpdateDocument([FromRoute] int id, [FromBody] DocumentDto docDto)
         {
-            throw new NotImplementedException();
+            var docModel = _context.Documents.FirstOrDefault(x => x.Id == id);
+
+            if (docModel is null) return NotFound();
+
+            docModel.Name = docDto.Name;
+            docModel.Filetype = docDto.Filetype;
+            docModel.ByteSize = docDto.ByteSize;
+            docModel.CreatedAt = docDto.CreatedAt;
+            docModel.UpdatedAt = docDto.UpdatedAt;
+            _context.SaveChanges();
+
+            return Ok(_mapper.Map<DocumentDto>(docModel));
         }
     }
 }
