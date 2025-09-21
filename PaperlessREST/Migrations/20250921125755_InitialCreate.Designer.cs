@@ -12,7 +12,7 @@ using PaperlessREST.Data;
 namespace PaperlessREST.Migrations
 {
     [DbContext(typeof(ApplicationDBContext))]
-    [Migration("20250921105450_InitialCreate")]
+    [Migration("20250921125755_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
