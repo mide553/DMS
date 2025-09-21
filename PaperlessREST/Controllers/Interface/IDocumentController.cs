@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PaperlessREST.Model;
+using PaperlessREST.DTOs;
 
 namespace PaperlessREST.Services.Interface
 {
@@ -7,7 +8,7 @@ namespace PaperlessREST.Services.Interface
     {
         public IActionResult GetAllDocuments();
         public IActionResult GetDocumentById(int id);
-        public IActionResult AddDocument(Document document);
+        public IActionResult AddDocument(DocumentDto docDto);
         public IActionResult DeleteDocument(int id);
         public IActionResult UpdateDocument(int id, Document document);
     }

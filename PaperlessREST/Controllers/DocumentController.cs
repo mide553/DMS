@@ -1,7 +1,9 @@
 ﻿using PaperlessREST.Services.Interface;
 using PaperlessREST.Data;
 using PaperlessREST.Model;
+using PaperlessREST.DTOs;
 using Microsoft.AspNetCore.Mvc;
+using AutoMapper;
 
 namespace PaperlessREST.Services
 {
@@ -10,9 +12,11 @@ namespace PaperlessREST.Services
     public class DocumentController : ControllerBase, IDocumentController
     {
         private readonly ApplicationDBContext _context;
-        public DocumentController(ApplicationDBContext dbContext)
+        private readonly IMapper _mapper;
+        public DocumentController(ApplicationDBContext dbContext, IMapper mapper)
         {
             _context = dbContext;
+            _mapper = mapper;
         }
 
         [HttpGet]
@@ -25,15 +29,22 @@ namespace PaperlessREST.Services
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetDocumentById(int id)
+        public IActionResult GetDocumentById([FromRoute] int id)
         {
-            throw new NotImplementedException();
+            var doc = _context.Documents.Find(id);
+            
+            if (doc is null) return NotFound();
+            return Ok(doc);
         }
 
         [HttpPost]
-        public IActionResult AddDocument(Document document)
+        public IActionResult AddDocument([FromBody] DocumentDto docDto)
         {
-            throw new NotImplementedException();
+            var docModel = _mapper.Map<Document>(docDto);
+            _context.Documents.Add(docModel);
+            _context.SaveChanges();
+
+            return CreatedAtAction(nameof(GetDocumentById), new { id = docModel.Id }, _mapper.Map<DocumentDto>(docModel));
         }
 
         [HttpPut]
