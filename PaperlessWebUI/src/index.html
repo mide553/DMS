@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Management System - Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Document Management System</h1>
+            <nav>
+                <a href="index.html" class="nav-link active">Dashboard</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="dashboard">
+                <div class="dashboard-header">
+                    <h2>All Documents</h2>
+                    <div class="search-container">
+                        <input type="text" id="searchInput" placeholder="Search documents...">
+                        <button id="searchBtn" class="btn btn-secondary">Search</button>
+                        <button id="addDocumentBtn" class="btn btn-primary">Add Document</button>
+                    </div>
+                </div>
+
+                <div class="loading" id="loading">Loading documents...</div>
+                <div class="error" id="errorMessage" style="display: none;"></div>
+
+                <div class="documents-grid" id="documentsGrid">
+                    <!-- Documents loaded here -->
+                </div>
+
+                <div class="no-documents" id="noDocuments" style="display: none;">
+                    <p>No documents found. <a href="#" id="addFirstDocument">Add your first document</a></p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Add Document Modal -->
+    <div id="addDocumentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Document</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="addDocumentForm">
+                <div class="form-group">
+                    <label for="documentName">Name:</label>
+                    <input type="text" id="documentName" required>
+                </div>
+                <div class="form-group">
+                    <label for="documentFiletype">File Type:</label>
+                    <select id="documentFiletype" required>
+                        <option value="">Select file type</option>
+                        <option value="pdf">PDF</option>
+                        <option value="docx">Word Document</option>
+                        <option value="xlsx">Excel</option>
+                        <option value="txt">Text</option>
+                        <option value="jpg">Image (JPG)</option>
+                        <option value="png">Image (PNG)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="documentByteSize">File Size (bytes):</label>
+                    <input type="number" id="documentByteSize" min="0" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelAdd">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/dashboard.js"></script>
+</body>
+</html>

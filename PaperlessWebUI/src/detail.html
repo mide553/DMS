@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Details - Document Management System</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Document Management System</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Dashboard</a>
+                <span class="nav-separator">›</span>
+                <span class="nav-link active">Document Details</span>
+            </nav>
+        </header>
+
+        <main>
+            <section class="document-detail">
+                <div class="loading" id="loading">Loading document...</div>
+                <div class="error" id="errorMessage" style="display: none;"></div>
+
+                <div id="documentContent" style="display: none;">
+                    <div class="detail-header">
+                        <h2 id="documentTitle"></h2>
+                        <div class="detail-actions">
+                            <button id="editDocumentBtn" class="btn btn-primary">Edit</button>
+                            <button id="deleteDocumentBtn" class="btn btn-danger">Delete</button>
+                        </div>
+                    </div>
+
+                    <div class="document-info">
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <label>Document ID:</label>
+                                <span id="documentId"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Name:</label>
+                                <span id="documentName"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>File Type:</label>
+                                <span id="documentFiletype"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>File Size:</label>
+                                <span id="documentByteSize"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Created At:</label>
+                                <span id="documentCreatedAt"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Last Updated:</label>
+                                <span id="documentUpdatedAt"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Edit Document Modal -->
+    <div id="editDocumentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Document</h3>
+                <span class="close">&times;</span>
+            </div>
+            <form id="editDocumentForm">
+                <div class="form-group">
+                    <label for="editDocumentName">Name:</label>
+                    <input type="text" id="editDocumentName" required>
+                </div>
+                <div class="form-group">
+                    <label for="editDocumentFiletype">File Type:</label>
+                    <select id="editDocumentFiletype" required>
+                        <option value="pdf">PDF</option>
+                        <option value="docx">Word Document</option>
+                        <option value="xlsx">Excel</option>
+                        <option value="txt">Text</option>
+                        <option value="jpg">Image (JPG)</option>
+                        <option value="png">Image (PNG)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editDocumentByteSize">File Size (bytes):</label>
+                    <input type="number" id="editDocumentByteSize" min="0" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelEdit">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Confirm Deletion</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this document? This action cannot be undone.</p>
+                <p><strong id="deleteDocumentName"></strong></p>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" id="cancelDelete">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/detail.js"></script>
+</body>
+</html>
