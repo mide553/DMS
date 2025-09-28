@@ -12,6 +12,9 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - paperless-network
+
   api:
     build:
       context: .
@@ -23,9 +26,26 @@ services:
       ASPNETCORE_URLS: "http://+:5000"
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
-
     depends_on:
       - db
+    networks:
+      - paperless-network
+
+  web:
+    build:
+      context: ./PaperlessWebUI
+      dockerfile: Dockerfile
+    container_name: PaperlessWebUI
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    networks:
+      - paperless-network
+
+networks:
+  paperless-network:
+    driver: bridge
 
 volumes:
   postgres_data:

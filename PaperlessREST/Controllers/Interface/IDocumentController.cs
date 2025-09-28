@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using PaperlessREST.Model;
 using PaperlessREST.DTOs;
 
 namespace PaperlessREST.Services.Interface
