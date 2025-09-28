@@ -25,8 +25,8 @@ namespace PaperlessREST.Services
         {
             List<Document> docs = _context.Documents.ToList();
             
-            if (docs is null) return NotFound();
-            return Ok(docs);
+            if (docs is null) return NotFound();    // 404 Not Found
+            return Ok(docs);    // 200 Ok
         }
 
         [HttpGet("{id}")]
@@ -34,8 +34,8 @@ namespace PaperlessREST.Services
         {
             var doc = _context.Documents.Find(id);
             
-            if (doc is null) return NotFound();
-            return Ok(doc);
+            if (doc is null) return NotFound(); // 404 Not Found
+            return Ok(doc); // 200 Ok
         }
 
         [HttpPost]
@@ -45,7 +45,8 @@ namespace PaperlessREST.Services
             _context.Documents.Add(docModel);
             _context.SaveChanges();
 
-            return CreatedAtAction(nameof(GetDocumentById), new { id = docModel.Id }, _mapper.Map<DocumentDto>(docModel));
+            // Return created Document as DTO Object
+            return CreatedAtAction(nameof(GetDocumentById), new { id = docModel.Id }, _mapper.Map<DocumentDto>(docModel));  // 201 Created
         }
 
         [HttpDelete("{id}")]
@@ -53,12 +54,12 @@ namespace PaperlessREST.Services
         {
             var docModel = _context.Documents.FirstOrDefault(x => x.Id == id);
 
-            if (docModel is null) return NotFound();
+            if (docModel is null) return NotFound();    // 404 Not Found
 
             _context.Documents.Remove(docModel); 
             _context.SaveChanges();
 
-            return NoContent();
+            return NoContent(); // 204 No Content
         }
 
         [HttpPut("{id}")]
@@ -66,7 +67,7 @@ namespace PaperlessREST.Services
         {
             var docModel = _context.Documents.FirstOrDefault(x => x.Id == id);
 
-            if (docModel is null) return NotFound();
+            if (docModel is null) return NotFound();    // 404 Not Found
 
             docModel.Name = docDto.Name;
             docModel.Filetype = docDto.Filetype;
@@ -75,7 +76,8 @@ namespace PaperlessREST.Services
             docModel.UpdatedAt = docDto.UpdatedAt;
             _context.SaveChanges();
 
-            return Ok(_mapper.Map<DocumentDto>(docModel));
+            // Return updated Document as DTO Object
+            return Ok(_mapper.Map<DocumentDto>(docModel));  // 200 Ok
         }
     }
 }
