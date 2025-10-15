@@ -2,8 +2,8 @@
 using PaperlessREST.Services.Interface;
 using AutoMapper;
 using PaperlessREST.Data;
-using PaperlessREST.Model;
-using PaperlessREST.DTOs;
+using PaperlessModels.Models;
+using PaperlessModels.DTOs;
 
 namespace PaperlessREST.Services
 {
@@ -26,7 +26,7 @@ namespace PaperlessREST.Services
         public IActionResult GetAllDocuments()
         {
             List<Document> docs = _context.Documents.ToList();
-            
+
             if (docs is null) return NotFound();    // 404 Not Found
             return Ok(docs);    // 200 Ok
         }
@@ -35,7 +35,7 @@ namespace PaperlessREST.Services
         public IActionResult GetDocumentById([FromRoute] int id)
         {
             var doc = _context.Documents.Find(id);
-            
+
             if (doc is null) return NotFound(); // 404 Not Found
             return Ok(doc); // 200 Ok
         }
@@ -63,7 +63,7 @@ namespace PaperlessREST.Services
 
             if (docModel is null) return NotFound();    // 404 Not Found
 
-            _context.Documents.Remove(docModel); 
+            _context.Documents.Remove(docModel);
             _context.SaveChanges();
 
             return NoContent(); // 204 No Content

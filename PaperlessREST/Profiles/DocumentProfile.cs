@@ -1,6 +1,6 @@
 ﻿using AutoMapper;
-using PaperlessREST.Model;
-using PaperlessREST.DTOs;
+using PaperlessModels.Models;
+using PaperlessModels.DTOs;
 
 namespace PaperlessREST.Profiles
 {

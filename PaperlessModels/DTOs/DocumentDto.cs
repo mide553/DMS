@@ -1,11 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-namespace PaperlessREST.Model
+﻿namespace PaperlessModels.DTOs
 {
-    public class Document
+    public class DocumentDto
     {
-        [Key]
-        public int Id { get; set; }
         public string Name { get; set; }
         public string Filetype { get; set; }
         public int ByteSize { get; set; }

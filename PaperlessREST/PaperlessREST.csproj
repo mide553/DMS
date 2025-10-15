@@ -25,4 +25,8 @@
     <Folder Include="Services\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PaperlessModels\PaperlessModels.csproj" />
+  </ItemGroup>
+
 </Project>

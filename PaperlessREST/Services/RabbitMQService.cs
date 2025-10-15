@@ -1,5 +1,5 @@
 ﻿using RabbitMQ.Client;
-using PaperlessREST.Model;
+using PaperlessModels.Models;
 using System.Text;
 using System.Text.Json;
 
