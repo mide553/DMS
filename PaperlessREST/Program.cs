@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PaperlessREST.Data;
+using PaperlessREST.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,9 @@ builder.Services.AddDbContext<ApplicationDBContext>(options =>
 
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
+
+// RabbitMQ
+builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
 
 var app = builder.Build();
 

@@ -13,11 +13,13 @@ namespace PaperlessREST.Services
     {
         private readonly ApplicationDBContext _context;
         private readonly IMapper _mapper;
+        private readonly IMessageQueueService _queueService;
 
-        public DocumentController(ApplicationDBContext dbContext, IMapper mapper)
+        public DocumentController(ApplicationDBContext dbContext, IMapper mapper, IMessageQueueService queueService)
         {
             _context = dbContext;
             _mapper = mapper;
+            _queueService = queueService;
         }
 
         [HttpGet]
@@ -39,9 +41,14 @@ namespace PaperlessREST.Services
         }
 
         [HttpPost]
-        public IActionResult AddDocument([FromBody] DocumentDto docDto)
+        public async Task<IActionResult> UploadDocument([FromBody] DocumentDto docDto)
         {
-            var docModel = _mapper.Map<Document>(docDto);
+            Document docModel = _mapper.Map<Document>(docDto);
+
+            // Add document to queue
+            await _queueService.PublishAsync("ocr_queue", docModel);
+
+            // Save document to database
             _context.Documents.Add(docModel);
             _context.SaveChanges();
 
