@@ -3,6 +3,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
+using OcrWorker.Exceptions;
 
 namespace OcrWorker
 {
@@ -18,9 +19,9 @@ namespace OcrWorker
 
             var factory = new ConnectionFactory
             {
-                HostName = config["RABBITMQ_HOST"] ?? "localhost",
-                UserName = config["RABBITMQ_USER"] ?? "guest",
-                Password = config["RABBITMQ_PASSWORD"] ?? "guest"
+                HostName = config["RABBITMQ_HOST"],
+                UserName = config["RABBITMQ_USER"],
+                Password = config["RABBITMQ_PASSWORD"]
             };
             _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
@@ -29,8 +30,9 @@ namespace OcrWorker
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             // Declare Queue
+            string queueName = "ocr_queue";
             await _channel.QueueDeclareAsync(
-                queue: "ocr_queue",
+                queue: queueName,
                 durable: true,
                 exclusive: false,
                 autoDelete: false
@@ -54,22 +56,25 @@ namespace OcrWorker
                     }
 
                     // Acknowledge message (deletes file)
+                    _logger.LogInformation($"Finished process on document {document.Name}");
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 }
                 catch (JsonException ex)
                 {
                     _logger.LogError(ex, $"Invalid JSON message: {json}");
+                    throw new InvalidJsonMessageException(json);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error processing document message");
                     await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+                    throw new OcrWorkerProcessException(ex);
                 }
             };
 
             // Consume message from Queue
             await _channel.BasicConsumeAsync(
-                queue: "ocr_queue",
+                queue: queueName,
                 autoAck: false,
                 consumer:
                 consumer

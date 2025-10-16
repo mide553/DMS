@@ -30,7 +30,7 @@ services:
       - "5672:5672"     # AMQP
       - "15672:15672"   # Management UI
     healthcheck:
-      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping && nc -z localhost 5672"]
       interval: 5s
       retries: 5
     volumes:
@@ -51,6 +51,8 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+    networks:
+      - paperless-network
 
   api:
     build:
