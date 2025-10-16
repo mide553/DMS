@@ -64,11 +64,7 @@ tagging and full text search (ElasticSearch).
    http://localhost:5000/swagger/index.html
 
 
-4. **Access the Swagger UI:**
-   - Open http://localhost:5000/swagger/index.html in your browser
-
-
-5. **Access the RabbitMQ:**
+4. **Access the RabbitMQ:**
    - Open http://localhost:15672/ in your browser
    - Enter credentials
 
