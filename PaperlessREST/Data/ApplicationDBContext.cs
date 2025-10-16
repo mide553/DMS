@@ -1,5 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using PaperlessREST.Model;
+using PaperlessModels.Models;
 
 namespace PaperlessREST.Data
 {
