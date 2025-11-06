@@ -6,6 +6,7 @@ namespace PaperlessREST.Services
     public interface IDocumentStorageService
     {
         public Task UploadFileAsync(string documentName, string filePath);
+        public Task DeleteFileAsync(string documentName);
     }
     
     public class MinIOService : IDocumentStorageService
@@ -44,6 +45,25 @@ namespace PaperlessREST.Services
                 .WithFileName(filePath));
 
             _logger.LogInformation($"Uploaded {documentName} to MinIO (Bucket: {_bucketName})");
+        }
+
+        public async Task DeleteFileAsync(string documentName)
+        {
+            try
+            {
+                _logger.LogInformation($"Deleting file {documentName} from MinIO...");
+
+                await _client.RemoveObjectAsync(new RemoveObjectArgs()
+                    .WithBucket(_bucketName)
+                    .WithObject(documentName));
+
+                _logger.LogInformation($"Successfully deleted {documentName} from MinIO.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to delete {documentName} from MinIO.");
+                throw;
+            }
         }
     }
 }

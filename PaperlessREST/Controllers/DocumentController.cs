@@ -78,7 +78,7 @@ namespace PaperlessREST.Services
                 return BadRequest("Maximum size can be 5MB");
 
             string fileName = file.FileName;
-            
+
             // Save uploaded file temporaryly inside container
             var tempPath = Path.Combine(Path.GetTempPath(), file.FileName);
             using (var stream = System.IO.File.Create(tempPath))
@@ -143,6 +143,8 @@ namespace PaperlessREST.Services
             {
                 _context.Documents.Remove(docModel);
                 _context.SaveChanges();
+
+                _documentStorage.DeleteFileAsync(docModel.FileName);
             }
             catch (Exception ex)
             {
