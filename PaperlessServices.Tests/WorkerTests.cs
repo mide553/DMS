@@ -28,14 +28,13 @@ public class WorkerTests
     [Test]
     public void DeserializeMessage_ValidDocument_ReturnsCorrectDocument()
     {
-        var json = @"{""Id"":1,""Name"":""test.pdf"",""Filetype"":""pdf"",""ByteSize"":1024}";
+        var json = @"{""Id"":1,""FileName"":""test.pdf"",""ByteSize"":1024,""Summary"":"""",""LastModified"":""2025-11-06T10:00:00Z""}";
 
         var document = JsonSerializer.Deserialize<Document>(json);
 
         Assert.That(document, Is.Not.Null);
         Assert.That(document.Id, Is.EqualTo(1));
-        Assert.That(document.Name, Is.EqualTo("test.pdf"));
-        Assert.That(document.Filetype, Is.EqualTo("pdf"));
+        Assert.That(document.FileName, Is.EqualTo("test.pdf"));
         Assert.That(document.ByteSize, Is.EqualTo(1024));
     }
 
@@ -50,13 +49,13 @@ public class WorkerTests
     [Test]
     public void DeserializeMessage_MissingFields_DeserializesWithDefaults()
     {
-        var json = @"{""Id"":10,""Name"":""minimal.pdf""}";
+        var json = @"{""Id"":10,""FileName"":""minimal.pdf""}";
 
         var document = JsonSerializer.Deserialize<Document>(json);
 
         Assert.That(document, Is.Not.Null);
         Assert.That(document.Id, Is.EqualTo(10));
-        Assert.That(document.Name, Is.EqualTo("minimal.pdf"));
+        Assert.That(document.FileName, Is.EqualTo("minimal.pdf"));
     }
 
     [Test]
@@ -99,11 +98,10 @@ public class WorkerTests
         var original = new Document
         {
             Id = 42,
-            Name = "contract.pdf",
-            Filetype = "pdf",
+            FileName = "contract.pdf",
             ByteSize = 4096,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            Summary = "Contract document",
+            LastModified = DateTime.UtcNow
         };
 
         var json = JsonSerializer.Serialize(original);
@@ -111,9 +109,9 @@ public class WorkerTests
 
         Assert.That(deserialized, Is.Not.Null);
         Assert.That(deserialized.Id, Is.EqualTo(original.Id));
-        Assert.That(deserialized.Name, Is.EqualTo(original.Name));
-        Assert.That(deserialized.Filetype, Is.EqualTo(original.Filetype));
+        Assert.That(deserialized.FileName, Is.EqualTo(original.FileName));
         Assert.That(deserialized.ByteSize, Is.EqualTo(original.ByteSize));
+        Assert.That(deserialized.Summary, Is.EqualTo(original.Summary));
     }
 
     [Test]

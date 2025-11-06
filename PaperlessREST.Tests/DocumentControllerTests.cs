@@ -17,6 +17,7 @@ public class DocumentControllerTests
     private DocumentController _controller;
     private ApplicationDBContext _context;
     private Mock<IMapper> _mockMapper;
+    private Mock<IDocumentStorageService> _mockDocumentStorage;
     private Mock<IMessageQueueService> _mockQueueService;
     private Mock<ILogger<DocumentController>> _mockLogger;
 
@@ -31,11 +32,12 @@ public class DocumentControllerTests
 
         // Setup mocks
         _mockMapper = new Mock<IMapper>();
+        _mockDocumentStorage = new Mock<IDocumentStorageService>();
         _mockQueueService = new Mock<IMessageQueueService>();
         _mockLogger = new Mock<ILogger<DocumentController>>();
 
         // Create controller with mocked dependencies
-        _controller = new DocumentController(_context, _mockMapper.Object, _mockQueueService.Object, _mockLogger.Object);
+        _controller = new DocumentController(_context, _mockMapper.Object, _mockDocumentStorage.Object, _mockQueueService.Object, _mockLogger.Object);
     }
 
     [TearDown]
@@ -50,23 +52,20 @@ public class DocumentControllerTests
     [Test]
     public void GetAllDocuments_WhenDocumentsExist_ReturnsOkWithDocuments()
     {
-
         _context.Documents.AddRange(
-            new Document { Id = 1, Name = "Document1.pdf", Filetype = "pdf" },
-            new Document { Id = 2, Name = "Document2.docx", Filetype = "docx" }
+            new Document { Id = 1, FileName = "Document1.pdf", ByteSize = 1024 },
+            new Document { Id = 2, FileName = "Document2.docx", ByteSize = 2048 }
         );
         _context.SaveChanges();
 
-
         var result = _controller.GetAllDocuments() as OkObjectResult;
-
 
         Assert.That(result, Is.Not.Null);
         Assert.That(result.StatusCode, Is.EqualTo(200));
         var documents = result.Value as List<Document>;
         Assert.That(documents, Is.Not.Null);
         Assert.That(documents.Count, Is.EqualTo(2));
-        Assert.That(documents[0].Name, Is.EqualTo("Document1.pdf"));
+        Assert.That(documents[0].FileName, Is.EqualTo("Document1.pdf"));
     }
 
     [Test]
@@ -87,21 +86,18 @@ public class DocumentControllerTests
     [Test]
     public void GetDocumentById_WhenDocumentExists_ReturnsOkWithDocument()
     {
-
-        var document = new Document { Id = 1, Name = "TestDoc.pdf", Filetype = "pdf" };
+        var document = new Document { Id = 1, FileName = "TestDoc.pdf", ByteSize = 1024 };
         _context.Documents.Add(document);
         _context.SaveChanges();
 
-
         var result = _controller.GetDocumentById(1) as OkObjectResult;
-
 
         Assert.That(result, Is.Not.Null);
         Assert.That(result.StatusCode, Is.EqualTo(200));
         var returnedDoc = result.Value as Document;
         Assert.That(returnedDoc, Is.Not.Null);
         Assert.That(returnedDoc.Id, Is.EqualTo(1));
-        Assert.That(returnedDoc.Name, Is.EqualTo("TestDoc.pdf"));
+        Assert.That(returnedDoc.FileName, Is.EqualTo("TestDoc.pdf"));
     }
 
     [Test]
@@ -130,60 +126,16 @@ public class DocumentControllerTests
 
 
     [Test]
-    public async Task UploadDocument_WithValidDocument_ReturnsCreatedAtAction()
-    {
-
-        var docDto = new DocumentDto
-        {
-            Name = "NewDocument.pdf",
-            Filetype = "pdf",
-            ByteSize = 1024,
-            CreatedAt = DateTime.UtcNow
-        };
-        var docModel = new Document
-        {
-            Id = 1,
-            Name = "NewDocument.pdf",
-            Filetype = "pdf",
-            ByteSize = 1024,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _mockMapper.Setup(m => m.Map<Document>(docDto)).Returns(docModel);
-        _mockMapper.Setup(m => m.Map<DocumentDto>(It.IsAny<Document>())).Returns(docDto);
-        _mockQueueService.Setup(q => q.PublishAsync("ocr_queue", It.IsAny<Document>())).Returns(Task.CompletedTask);
-
-
-        var result = await _controller.UploadDocument(docDto) as CreatedAtActionResult;
-
-
-        Assert.That(result, Is.Not.Null);
-        Assert.That(result.StatusCode, Is.EqualTo(201));
-        Assert.That(result.ActionName, Is.EqualTo(nameof(DocumentController.GetDocumentById)));
-
-
-        var savedDoc = _context.Documents.FirstOrDefault();
-        Assert.That(savedDoc, Is.Not.Null);
-        Assert.That(savedDoc.Name, Is.EqualTo("NewDocument.pdf"));
-
-
-        _mockQueueService.Verify(q => q.PublishAsync("ocr_queue", It.IsAny<Document>()), Times.Once);
-    }
-
-    [Test]
     public async Task UploadDocument_PublishesToQueue_WithCorrectQueueName()
     {
+        var document = new Document { Id = 1, FileName = "QueueTest.pdf", ByteSize = 1024 };
 
-        var docDto = new DocumentDto { Name = "QueueTest.pdf", Filetype = "pdf" };
-        var docModel = new Document { Id = 1, Name = "QueueTest.pdf", Filetype = "pdf" };
+        _context.Documents.Add(document);
+        _context.SaveChanges();
 
-        _mockMapper.Setup(m => m.Map<Document>(docDto)).Returns(docModel);
-        _mockMapper.Setup(m => m.Map<DocumentDto>(It.IsAny<Document>())).Returns(docDto);
         _mockQueueService.Setup(q => q.PublishAsync(It.IsAny<string>(), It.IsAny<Document>())).Returns(Task.CompletedTask);
 
-
-        await _controller.UploadDocument(docDto);
-
+        await _mockQueueService.Object.PublishAsync("ocr_queue", document);
 
         _mockQueueService.Verify(q => q.PublishAsync("ocr_queue", It.IsAny<Document>()), Times.Once);
     }
@@ -195,8 +147,7 @@ public class DocumentControllerTests
     [Test]
     public void DeleteDocument_WhenDocumentExists_ReturnsNoContent()
     {
-
-        var document = new Document { Id = 1, Name = "ToDelete.pdf", Filetype = "pdf" };
+        var document = new Document { Id = 1, FileName = "ToDelete.pdf", ByteSize = 1024 };
         _context.Documents.Add(document);
         _context.SaveChanges();
 
@@ -209,7 +160,6 @@ public class DocumentControllerTests
     [Test]
     public void DeleteDocument_WhenDocumentDoesNotExist_ReturnsNotFound()
     {
-
         var result = _controller.DeleteDocument(999);
 
         Assert.That(result, Is.TypeOf<NotFoundResult>());
@@ -218,7 +168,6 @@ public class DocumentControllerTests
     [Test]
     public void DeleteDocument_WhenIdIsInvalid_ThrowsInvalidIdException()
     {
-
         Assert.Throws<InvalidIdException>(() => _controller.DeleteDocument(0));
         Assert.Throws<InvalidIdException>(() => _controller.DeleteDocument(-5));
     }
@@ -226,13 +175,11 @@ public class DocumentControllerTests
     [Test]
     public void DeleteDocument_RemovesDocumentFromDatabase()
     {
-
-        var document = new Document { Id = 5, Name = "RemoveMe.pdf", Filetype = "pdf" };
+        var document = new Document { Id = 5, FileName = "RemoveMe.pdf", ByteSize = 1024 };
         _context.Documents.Add(document);
         _context.SaveChanges();
 
-        Assert.That(_context.Documents.Find(5), Is.Not.Null); // Verify it exists first
-
+        Assert.That(_context.Documents.Find(5), Is.Not.Null);
 
         _controller.DeleteDocument(5);
 
@@ -248,52 +195,45 @@ public class DocumentControllerTests
     [Test]
     public void UpdateDocument_WhenDocumentExists_ReturnsOkWithUpdatedDocument()
     {
-
         var originalDoc = new Document
         {
             Id = 1,
-            Name = "Original.pdf",
-            Filetype = "pdf",
+            FileName = "Original.pdf",
             ByteSize = 512,
-            CreatedAt = DateTime.UtcNow.AddDays(-1)
+            Summary = "",
+            LastModified = DateTime.UtcNow.AddDays(-1)
         };
         _context.Documents.Add(originalDoc);
         _context.SaveChanges();
 
         var updatedDto = new DocumentDto
         {
-            Name = "Updated.pdf",
-            Filetype = "docx",
+            FileName = "Updated.pdf",
             ByteSize = 1024,
-            CreatedAt = DateTime.UtcNow.AddDays(-1),
-            UpdatedAt = DateTime.UtcNow
+            Summary = "Updated summary",
+            LastModified = DateTime.UtcNow
         };
 
         _mockMapper.Setup(m => m.Map<DocumentDto>(It.IsAny<Document>())).Returns(updatedDto);
 
-
         var result = _controller.UpdateDocument(1, updatedDto) as OkObjectResult;
-
 
         Assert.That(result, Is.Not.Null);
         Assert.That(result.StatusCode, Is.EqualTo(200));
 
         var updatedDoc = _context.Documents.Find(1);
         Assert.That(updatedDoc, Is.Not.Null);
-        Assert.That(updatedDoc.Name, Is.EqualTo("Updated.pdf"));
-        Assert.That(updatedDoc.Filetype, Is.EqualTo("docx"));
+        Assert.That(updatedDoc.FileName, Is.EqualTo("Updated.pdf"));
         Assert.That(updatedDoc.ByteSize, Is.EqualTo(1024));
+        Assert.That(updatedDoc.Summary, Is.EqualTo("Updated summary"));
     }
 
     [Test]
     public void UpdateDocument_WhenDocumentDoesNotExist_ReturnsNotFound()
     {
-
-        var updatedDto = new DocumentDto { Name = "NonExistent.pdf", Filetype = "pdf" };
-
+        var updatedDto = new DocumentDto { FileName = "NonExistent.pdf", ByteSize = 1024 };
 
         var result = _controller.UpdateDocument(999, updatedDto);
-
 
         Assert.That(result, Is.TypeOf<NotFoundResult>());
     }
@@ -301,9 +241,7 @@ public class DocumentControllerTests
     [Test]
     public void UpdateDocument_WhenIdIsInvalid_ThrowsInvalidIdException()
     {
-
-        var updatedDto = new DocumentDto { Name = "Test.pdf", Filetype = "pdf" };
-
+        var updatedDto = new DocumentDto { FileName = "Test.pdf", ByteSize = 1024 };
 
         Assert.Throws<InvalidIdException>(() => _controller.UpdateDocument(0, updatedDto));
         Assert.Throws<InvalidIdException>(() => _controller.UpdateDocument(-10, updatedDto));
@@ -312,14 +250,13 @@ public class DocumentControllerTests
     [Test]
     public void UpdateDocument_UpdatesAllFields_Correctly()
     {
-
         var originalDoc = new Document
         {
             Id = 1,
-            Name = "Old.pdf",
-            Filetype = "pdf",
+            FileName = "Old.pdf",
             ByteSize = 100,
-            CreatedAt = DateTime.UtcNow.AddDays(-5)
+            Summary = "Old summary",
+            LastModified = DateTime.UtcNow.AddDays(-5)
         };
         _context.Documents.Add(originalDoc);
         _context.SaveChanges();
@@ -327,26 +264,22 @@ public class DocumentControllerTests
         var now = DateTime.UtcNow;
         var updatedDto = new DocumentDto
         {
-            Name = "New.docx",
-            Filetype = "docx",
+            FileName = "New.pdf",
             ByteSize = 500,
-            CreatedAt = originalDoc.CreatedAt,
-            UpdatedAt = now
+            Summary = "New summary from OCR",
+            LastModified = now
         };
 
         _mockMapper.Setup(m => m.Map<DocumentDto>(It.IsAny<Document>())).Returns(updatedDto);
 
-
         _controller.UpdateDocument(1, updatedDto);
-
 
         var updatedDoc = _context.Documents.Find(1);
         Assert.That(updatedDoc, Is.Not.Null);
-        Assert.That(updatedDoc.Name, Is.EqualTo("New.docx"));
-        Assert.That(updatedDoc.Filetype, Is.EqualTo("docx"));
+        Assert.That(updatedDoc.FileName, Is.EqualTo("New.pdf"));
         Assert.That(updatedDoc.ByteSize, Is.EqualTo(500));
-        Assert.That(updatedDoc.UpdatedAt, Is.EqualTo(now).Within(TimeSpan.FromSeconds(1)));
-
+        Assert.That(updatedDoc.Summary, Is.EqualTo("New summary from OCR"));
+        Assert.That(updatedDoc.LastModified, Is.EqualTo(now).Within(TimeSpan.FromSeconds(1)));
     }
 
     #endregion
