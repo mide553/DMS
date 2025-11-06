@@ -2,6 +2,8 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 using OcrWorker.Exceptions;
+using OcrWorker.Services;
+using Tesseract;
 
 namespace OcrWorker
 {
@@ -9,9 +11,10 @@ namespace OcrWorker
     {
         private readonly IConnection _connection;
         private readonly IChannel _channel;
+        private readonly IDocumentStorageService _documentStorage;
         private readonly ILogger<Worker> _logger;
 
-        public Worker(ILogger<Worker> logger)
+        public Worker(IDocumentStorageService documentStorage, ILogger<Worker> logger)
         {
             var factory = new ConnectionFactory
             {
@@ -22,6 +25,7 @@ namespace OcrWorker
             _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
 
+            _documentStorage = documentStorage;
             _logger = logger;
         }
 
@@ -47,6 +51,9 @@ namespace OcrWorker
                 var localPath = Path.Combine("/tmp", fileName);
                 try
                 {
+                    // Download file
+                    await _documentStorage.DownloadFileAsync(fileName, localPath);
+
                     // Perform OCR
                     await ProcessDocumentAsync(localPath);
 
@@ -59,6 +66,11 @@ namespace OcrWorker
                     _logger.LogError(ex, "Error processing document message");
                     await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
                     throw new OcrWorkerProcessException(ex);
+                }
+                finally
+                {
+                    // Delete temp file after upload
+                    System.IO.File.Delete(localPath);
                 }
             };
 
@@ -73,12 +85,25 @@ namespace OcrWorker
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        private Task ProcessDocumentAsync(string localPath, CancellationToken token)
+        private Task ProcessDocumentAsync(string localPath)
         {
-            // Simulated OCR work
-            string fileName = Path.GetFileName(localPath);
-            _logger.LogInformation($"Performing OCR on {fileName}");
-            return Task.Delay(2000, token);
+            // OCR Processing
+            try
+            {
+                using var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default);
+                using var img = Pix.LoadFromFile(localPath);
+                using var page = engine.Process(img);
+                var text = page.GetText();
+
+                string fileName = Path.GetFileName(localPath);
+                _logger.LogInformation($"OCR Output for {fileName}:\n{text}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to convert images to text");
+                throw new Exception("Failed to convert images to text");
+            }
+            return Task.CompletedTask;
         }
 
         public async ValueTask DisposeAsync()
