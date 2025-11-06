@@ -1,30 +1,28 @@
-using PaperlessModels.Models;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
-using System.Text.Json;
 using OcrWorker.Exceptions;
 
 namespace OcrWorker
 {
     public class Worker : BackgroundService, IAsyncDisposable
     {
-        private readonly ILogger<Worker> _logger;
         private readonly IConnection _connection;
         private readonly IChannel _channel;
+        private readonly ILogger<Worker> _logger;
 
-        public Worker(IConfiguration config, ILogger<Worker> logger)
+        public Worker(ILogger<Worker> logger)
         {
-            _logger = logger;
-
             var factory = new ConnectionFactory
             {
-                HostName = config["RABBITMQ_HOST"],
-                UserName = config["RABBITMQ_USER"],
-                Password = config["RABBITMQ_PASSWORD"]
+                HostName = Environment.GetEnvironmentVariable("RABBITMQ_HOST"),
+                UserName = Environment.GetEnvironmentVariable("RABBITMQ_USER"),
+                Password = Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD")
             };
             _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
+
+            _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -43,26 +41,18 @@ namespace OcrWorker
             consumer.ReceivedAsync += async (model, ea) =>
             {
                 // Get message
-                var json = Encoding.UTF8.GetString(ea.Body.ToArray());
+                var fileName = Encoding.UTF8.GetString(ea.Body.ToArray());
+                _logger.LogInformation($"Received OCR job for {fileName}");
+
+                var localPath = Path.Combine("/tmp", fileName);
                 try
                 {
-                    // Convert message to document
-                    var document = JsonSerializer.Deserialize<Document>(json);
-
-                    if (document is not null)
-                    {
-                        _logger.LogInformation($"Processing document {document.FileName}");
-                        await ProcessDocumentAsync(document, stoppingToken);
-                    }
+                    // Perform OCR
+                    await ProcessDocumentAsync(localPath);
 
                     // Acknowledge message (deletes file)
-                    _logger.LogInformation($"Finished process on document {document.FileName}");
+                    _logger.LogInformation($"Finished process on document {fileName}");
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogError(ex, $"Invalid JSON message: {json}");
-                    throw new InvalidJsonMessageException(json);
                 }
                 catch (Exception ex)
                 {
@@ -83,10 +73,11 @@ namespace OcrWorker
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        private Task ProcessDocumentAsync(Document document, CancellationToken token)
+        private Task ProcessDocumentAsync(string localPath, CancellationToken token)
         {
             // Simulated OCR work
-            _logger.LogInformation($"Performing OCR on {document.FileName}");
+            string fileName = Path.GetFileName(localPath);
+            _logger.LogInformation($"Performing OCR on {fileName}");
             return Task.Delay(2000, token);
         }
 

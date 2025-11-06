@@ -5,13 +5,14 @@ namespace PaperlessREST.Services
 {
     public interface IDocumentStorageService
     {
-        public Task UploadFileAsync(string bucketName, string documentName, string filePath);
+        public Task UploadFileAsync(string documentName, string filePath);
     }
     
     public class MinIOService : IDocumentStorageService
     {
         private readonly IMinioClient _client;
         private readonly ILogger _logger;
+        private readonly string _bucketName = "documents";
 
         public MinIOService(ILogger<MinIOService> logger)
         {
@@ -27,22 +28,22 @@ namespace PaperlessREST.Services
             _logger = logger;
         }
 
-        public async Task UploadFileAsync(string bucketName, string documentName, string filePath)
+        public async Task UploadFileAsync(string documentName, string filePath)
         {
-            bool found = await _client.BucketExistsAsync(new BucketExistsArgs().WithBucket(bucketName));
-            if (!found)
+            bool exists = await _client.BucketExistsAsync(new BucketExistsArgs().WithBucket(_bucketName));
+            if (!exists)
             {
-                await _client.MakeBucketAsync(new MakeBucketArgs().WithBucket(bucketName));
-                _logger.LogInformation($"Created new Bucket: {bucketName}");
+                await _client.MakeBucketAsync(new MakeBucketArgs().WithBucket(_bucketName));
+                _logger.LogInformation($"Created new Bucket: {_bucketName}");
             }
 
             // Upload file
             await _client.PutObjectAsync(new PutObjectArgs()
-                .WithBucket(bucketName)
+                .WithBucket(_bucketName)
                 .WithObject(documentName)
                 .WithFileName(filePath));
 
-            _logger.LogInformation($"Uploaded {documentName} to MinIO (Bucket: {bucketName})");
+            _logger.LogInformation($"Uploaded {documentName} to MinIO (Bucket: {_bucketName})");
         }
     }
 }

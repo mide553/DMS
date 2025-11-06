@@ -77,6 +77,8 @@ namespace PaperlessREST.Services
             if (fileSize > (5 * 1024 * 1024))
                 return BadRequest("Maximum size can be 5MB");
 
+            string fileName = file.FileName;
+            
             // Save uploaded file temporaryly inside container
             var tempPath = Path.Combine(Path.GetTempPath(), file.FileName);
             using (var stream = System.IO.File.Create(tempPath))
@@ -87,14 +89,14 @@ namespace PaperlessREST.Services
             // Save metadata to database
             Document docModel = new Document()
             {
-                FileName = file.FileName,
-                ByteSize = (int) fileSize // TODO: In Model ByteSize auf long setzen
+                FileName = fileName,
+                ByteSize = (int)fileSize
             };
 
             try
             {
                 // Upload document to MinIO
-                await _documentStorage.UploadFileAsync("documents", file.FileName, tempPath);
+                await _documentStorage.UploadFileAsync(file.FileName, tempPath);
 
                 _context.Documents.Add(docModel); // TODO: Check if filename already exists
                 _context.SaveChanges();
@@ -111,8 +113,8 @@ namespace PaperlessREST.Services
             }
 
             // Add document to queue
-            _logger.LogInformation($"Document {docModel.FileName} sent to queue");
-            await _queueService.PublishAsync("ocr_queue", docModel);
+            _logger.LogInformation($"Document {fileName} sent to queue");
+            await _queueService.PublishAsync("ocr_queue", fileName);
 
             // Return created Document as DTO Object
             return CreatedAtAction(nameof(GetDocumentById), new { id = docModel.Id }, _mapper.Map<DocumentDto>(docModel));  // 201 Created
