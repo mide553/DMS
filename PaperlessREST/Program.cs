@@ -19,6 +19,9 @@ builder.Services.AddDbContext<ApplicationDBContext>(options =>
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
 
+// MinIO
+builder.Services.AddSingleton<IDocumentStorageService, MinIOService>();
+
 // RabbitMQ
 builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
 
