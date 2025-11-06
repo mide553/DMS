@@ -34,10 +34,6 @@
                     <div class="document-info">
                         <div class="info-grid">
                             <div class="info-item">
-                                <label>Name:</label>
-                                <span id="documentName"></span>
-                            </div>
-                            <div class="info-item">
                                 <label>File Type:</label>
                                 <span id="documentFiletype"></span>
                             </div>
@@ -52,6 +48,10 @@
                             <div class="info-item">
                                 <label>Last Updated:</label>
                                 <span id="documentUpdatedAt"></span>
+                            </div>
+                            <div class="info-item">
+                                <label>Summary:</label>
+                                <span id="documentSummary"></span>
                             </div>
                         </div>
                     </div>
@@ -69,23 +69,8 @@
             </div>
             <form id="editDocumentForm">
                 <div class="form-group">
-                    <label for="editDocumentName">Name:</label>
+                    <label for="editDocumentName">File Name:</label>
                     <input type="text" id="editDocumentName" required>
-                </div>
-                <div class="form-group">
-                    <label for="editDocumentFiletype">File Type:</label>
-                    <select id="editDocumentFiletype" required>
-                        <option value="pdf">PDF</option>
-                        <option value="docx">Word Document</option>
-                        <option value="xlsx">Excel</option>
-                        <option value="txt">Text</option>
-                        <option value="jpg">Image (JPG)</option>
-                        <option value="png">Image (PNG)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="editDocumentByteSize">File Size (bytes):</label>
-                    <input type="number" id="editDocumentByteSize" min="0" required>
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" id="cancelEdit">Cancel</button>
@@ -113,7 +98,7 @@
         </div>
     </div>
 
-    <script src="js/api.js"></script>
-    <script src="js/detail.js"></script>
+    <script src="js/api.js?v=12"></script>
+    <script src="js/detail.js?v=12"></script>
 </body>
 </html>
