@@ -1,30 +1,32 @@
-using PaperlessModels.Models;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
-using System.Text.Json;
 using OcrWorker.Exceptions;
+using OcrWorker.Services;
+using Tesseract;
 
 namespace OcrWorker
 {
     public class Worker : BackgroundService, IAsyncDisposable
     {
-        private readonly ILogger<Worker> _logger;
         private readonly IConnection _connection;
         private readonly IChannel _channel;
+        private readonly IDocumentStorageService _documentStorage;
+        private readonly ILogger<Worker> _logger;
 
-        public Worker(IConfiguration config, ILogger<Worker> logger)
+        public Worker(IDocumentStorageService documentStorage, ILogger<Worker> logger)
         {
-            _logger = logger;
-
             var factory = new ConnectionFactory
             {
-                HostName = config["RABBITMQ_HOST"],
-                UserName = config["RABBITMQ_USER"],
-                Password = config["RABBITMQ_PASSWORD"]
+                HostName = Environment.GetEnvironmentVariable("RABBITMQ_HOST"),
+                UserName = Environment.GetEnvironmentVariable("RABBITMQ_USER"),
+                Password = Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD")
             };
             _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
+
+            _documentStorage = documentStorage;
+            _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -43,32 +45,32 @@ namespace OcrWorker
             consumer.ReceivedAsync += async (model, ea) =>
             {
                 // Get message
-                var json = Encoding.UTF8.GetString(ea.Body.ToArray());
+                var fileName = Encoding.UTF8.GetString(ea.Body.ToArray());
+                _logger.LogInformation($"Received OCR job for {fileName}");
+
+                var localPath = Path.Combine("/tmp", fileName);
                 try
                 {
-                    // Convert message to document
-                    var document = JsonSerializer.Deserialize<Document>(json);
+                    // Download file
+                    await _documentStorage.DownloadFileAsync(fileName, localPath);
 
-                    if (document is not null)
-                    {
-                        _logger.LogInformation($"Processing document {document.Name}");
-                        await ProcessDocumentAsync(document, stoppingToken);
-                    }
+                    // Perform OCR
+                    await ProcessDocumentAsync(localPath);
 
                     // Acknowledge message (deletes file)
-                    _logger.LogInformation($"Finished process on document {document.Name}");
+                    _logger.LogInformation($"Finished process on document {fileName}");
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogError(ex, $"Invalid JSON message: {json}");
-                    throw new InvalidJsonMessageException(json);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error processing document message");
                     await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
                     throw new OcrWorkerProcessException(ex);
+                }
+                finally
+                {
+                    // Delete temp file after upload
+                    System.IO.File.Delete(localPath);
                 }
             };
 
@@ -83,11 +85,25 @@ namespace OcrWorker
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        private Task ProcessDocumentAsync(Document document, CancellationToken token)
+        private Task ProcessDocumentAsync(string localPath)
         {
-            // Simulated OCR work
-            _logger.LogInformation($"Performing OCR on {document.Name}");
-            return Task.Delay(2000, token);
+            // OCR Processing
+            try
+            {
+                using var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default);
+                using var img = Pix.LoadFromFile(localPath);
+                using var page = engine.Process(img);
+                var text = page.GetText();
+
+                string fileName = Path.GetFileName(localPath);
+                _logger.LogInformation($"OCR Output for {fileName}:\n{text}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to convert images to text");
+                throw new Exception("Failed to convert images to text");
+            }
+            return Task.CompletedTask;
         }
 
         public async ValueTask DisposeAsync()

@@ -108,13 +108,25 @@ class DocumentDetail {
             documentContent.style.display = 'block';
         }
 
+        // Handle both backend (PascalCase) and frontend (camelCase) property names
+        const fileName = doc.fileName || doc.FileName || doc.name || 'Unknown';
+        const fileSize = doc.byteSize || doc.ByteSize || 0;
+        const lastModified = doc.lastModified || doc.LastModified || doc.createdAt || new Date().toISOString();
+        const summary = doc.summary || doc.Summary || 'No summary available';
+
+        // Extract file type from filename
+        let fileType = doc.filetype || doc.FileType || '';
+        if (!fileType && fileName.includes('.')) {
+            fileType = fileName.split('.').pop();
+        }
+
         // Update document title and details
-        this.updateElement('documentTitle', `${doc.name}`);
-        this.updateElement('documentName', doc.name);
-        this.updateElement('documentFiletype', doc.filetype.toUpperCase());
-        this.updateElement('documentByteSize', utils.formatFileSize(doc.byteSize));
-        this.updateElement('documentCreatedAt', utils.formatDate(doc.createdAt));
-        this.updateElement('documentUpdatedAt', utils.formatDate(doc.updatedAt));
+        this.updateElement('documentTitle', fileName);
+        this.updateElement('documentFiletype', fileType ? fileType.toUpperCase() : 'N/A');
+        this.updateElement('documentByteSize', utils.formatFileSize(fileSize));
+        this.updateElement('documentCreatedAt', utils.formatDate(lastModified));
+        this.updateElement('documentUpdatedAt', utils.formatDate(lastModified));
+        this.updateElement('documentSummary', summary);
     }
 
     updateElement(elementId, content) {
@@ -129,13 +141,14 @@ class DocumentDetail {
 
         const modal = document.getElementById('editDocumentModal');
         if (modal) {
-            // Pre-fill form with current document data
-            document.getElementById('editDocumentName').value = this.currentDocument.name;
-            document.getElementById('editDocumentFiletype').value = this.currentDocument.filetype;
-            document.getElementById('editDocumentByteSize').value = this.currentDocument.byteSize;
+            const doc = this.currentDocument;
+            const fileName = doc.fileName || doc.FileName || doc.name || '';
+
+            const editName = document.getElementById('editDocumentName');
+            if (editName) editName.value = fileName;
 
             modal.style.display = 'block';
-            document.getElementById('editDocumentName')?.focus();
+            editName?.focus();
         }
     }
 
@@ -150,28 +163,21 @@ class DocumentDetail {
         event.preventDefault();
 
         const documentData = {
-            name: document.getElementById('editDocumentName')?.value,
-            filetype: document.getElementById('editDocumentFiletype')?.value,
-            byteSize: document.getElementById('editDocumentByteSize')?.value,
-            createdAt: this.currentDocument.createdAt
+            fileName: document.getElementById('editDocumentName')?.value,
+            byteSize: this.currentDocument.byteSize || this.currentDocument.ByteSize || 0,
+            summary: this.currentDocument.summary || this.currentDocument.Summary || '',
+            lastModified: new Date().toISOString()
         };
 
-        // Validation
-        if (!documentData.name || !documentData.filetype || !documentData.byteSize) {
-            this.showError('Please fill in all required fields.');
-            return;
-        }
-
-        if (parseInt(documentData.byteSize) < 0) {
-            this.showError('File size must be a positive number.');
+        if (!documentData.fileName) {
+            this.showError('Please enter a file name.');
             return;
         }
 
         try {
             utils.hideError('errorMessage');
 
-            const updatedDocument = await documentService.updateDocument(this.documentId, documentData);
-            this.currentDocument = updatedDocument;
+            this.currentDocument = await documentService.updateDocument(this.documentId, documentData);
             this.hideEditModal();
             this.renderDocument();
 
@@ -189,7 +195,7 @@ class DocumentDetail {
         const deleteDocumentName = document.getElementById('deleteDocumentName');
 
         if (modal && deleteDocumentName) {
-            deleteDocumentName.textContent = this.currentDocument.name;
+            deleteDocumentName.textContent = this.currentDocument.fileName || this.currentDocument.FileName || this.currentDocument.name || 'Unknown';
             modal.style.display = 'block';
         }
     }

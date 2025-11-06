@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document Management System - Dashboard</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
     <div class="container">
@@ -20,6 +20,7 @@
                 <div class="dashboard-header">
                     <h2>All Documents</h2>
                     <div class="search-container">
+                        <label for="searchInput" style="display: none;">Search documents</label>
                         <input type="text" id="searchInput" placeholder="Search documents...">
                         <button id="searchBtn" class="btn btn-secondary">Search</button>
                         <button id="addDocumentBtn" class="btn btn-primary">Add Document</button>
@@ -44,39 +45,45 @@
     <div id="addDocumentModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Add New Document</h3>
+                <h3>Upload Document</h3>
                 <span class="close">&times;</span>
             </div>
             <form id="addDocumentForm">
-                <div class="form-group">
-                    <label for="documentName">Name:</label>
-                    <input type="text" id="documentName" required>
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="fileInput" accept=".pdf" hidden>
+                    <div class="upload-placeholder" id="uploadPlaceholder">
+                        <svg viewBox="0 0 24 24" style="width: 64px; height: 64px; fill: none; stroke: currentColor; stroke-width: 2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <h4>Drop your PDF here</h4>
+                        <p>or click to browse</p>
+                    </div>
+                    <div class="file-preview" id="filePreview" style="display: none;">
+                        <div class="file-info">
+                            <svg viewBox="0 0 24 24" style="width: 48px; height: 48px; fill: none; stroke: currentColor; stroke-width: 2">
+                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                                <polyline points="13 2 13 9 20 9"></polyline>
+                            </svg>
+                            <div class="file-details">
+                                <strong id="fileName"></strong>
+                                <span id="fileSize"></span>
+                            </div>
+                            <button type="button" class="btn-remove" id="removeFile">&times;</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="documentFiletype">File Type:</label>
-                    <select id="documentFiletype" required>
-                        <option value="">Select file type</option>
-                        <option value="pdf">PDF</option>
-                        <option value="docx">Word Document</option>
-                        <option value="xlsx">Excel</option>
-                        <option value="txt">Text</option>
-                        <option value="jpg">Image (JPG)</option>
-                        <option value="png">Image (PNG)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="documentByteSize">File Size (bytes):</label>
-                    <input type="number" id="documentByteSize" min="0" required>
-                </div>
+                <div class="error" id="uploadError" style="display: none;"></div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" id="cancelAdd">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Document</button>
+                    <button type="submit" class="btn btn-primary" id="uploadBtn" disabled>Upload</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <script src="js/api.js"></script>
-    <script src="js/dashboard.js"></script>
+    <script src="js/api.js?v=8"></script>
+    <script src="js/dashboard.js?v=8"></script>
 </body>
 </html>

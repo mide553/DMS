@@ -1,14 +1,11 @@
 ﻿using RabbitMQ.Client;
-using PaperlessModels.Models;
 using System.Text;
-using System.Text.Json;
-using PaperlessREST.Exceptions;
 
 namespace PaperlessREST.Services
 {
     public interface IMessageQueueService
     {
-        Task PublishAsync(string queue, Document document);
+        Task PublishAsync(string queue, string message);
     }
 
     public class RabbitMQService : IMessageQueueService, IAsyncDisposable
@@ -17,13 +14,13 @@ namespace PaperlessREST.Services
         private readonly IChannel _channel;
         private readonly ILogger _logger;
 
-        public RabbitMQService(IConfiguration config, ILogger<RabbitMQService> logger)
+        public RabbitMQService(ILogger<RabbitMQService> logger)
         {
             var factory = new ConnectionFactory
             {
-                HostName = config["RABBITMQ_HOST"],
-                UserName = config["RABBITMQ_USER"],
-                Password = config["RABBITMQ_PASSWORD"]
+                HostName = Environment.GetEnvironmentVariable("RABBITMQ_HOST"),
+                UserName = Environment.GetEnvironmentVariable("RABBITMQ_USER"),
+                Password = Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD")
             };
 
             _connection = factory.CreateConnectionAsync("PaperlessREST-Connection").GetAwaiter().GetResult();
@@ -31,7 +28,7 @@ namespace PaperlessREST.Services
             _logger = logger;
         }
 
-        public async Task PublishAsync(string queue, Document document)
+        public async Task PublishAsync(string queue, string message)
         {
             // Declare Queue
             await _channel.QueueDeclareAsync(
@@ -40,21 +37,9 @@ namespace PaperlessREST.Services
                 exclusive: false,
                 autoDelete: false
             );
-
-            // Convert message to JSON
-            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(document));
-            try
-            {
-                var json = JsonSerializer.Serialize(document);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError($"Failed to convert {document.Name} to json");
-                throw new FailedConvertException(typeof(Document).ToString(), typeof(JsonSerializer).ToString(), ex);
-            }
-
+            
             // Publish message
-            _logger.LogInformation($"Document {document.Name} in queue {queue} ready to be processed");
+            var body = Encoding.UTF8.GetBytes(message);
             await _channel.BasicPublishAsync<BasicProperties>(
                 exchange: "",
                 routingKey: queue,
@@ -62,6 +47,8 @@ namespace PaperlessREST.Services
                 basicProperties: new BasicProperties(),
                 body: body
             );
+
+            _logger.LogInformation($"{message} in queue {queue} ready to be processed");
         }
 
         public async ValueTask DisposeAsync()

@@ -14,14 +14,16 @@ namespace PaperlessREST.Services
     {
         private readonly ApplicationDBContext _context;
         private readonly IMapper _mapper;
+        private readonly IDocumentStorageService _documentStorage;
         private readonly IMessageQueueService _queueService;
         private readonly ILogger<DocumentController> _logger;
 
 
-        public DocumentController(ApplicationDBContext dbContext, IMapper mapper, IMessageQueueService queueService, ILogger<DocumentController> logger)
+        public DocumentController(ApplicationDBContext dbContext, IMapper mapper, IDocumentStorageService documentStorage, IMessageQueueService queueService, ILogger<DocumentController> logger)
         {
             _context = dbContext;
             _mapper = mapper;
+            _documentStorage = documentStorage;
             _queueService = queueService;
             _logger = logger;
         }
@@ -63,16 +65,40 @@ namespace PaperlessREST.Services
             return Ok(doc); // 200 Ok
         }
 
-        [HttpPost]
-        public async Task<IActionResult> UploadDocument([FromBody] DocumentDto docDto)
+        [HttpPost("upload")]
+        public async Task<IActionResult> UploadDocument(IFormFile file)
         {
             _logger.LogInformation($"Uploading new document");
-            Document docModel = _mapper.Map<Document>(docDto);
 
-            // Save document to database
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded");
+
+            long fileSize = file.Length;
+            if (fileSize > (5 * 1024 * 1024))
+                return BadRequest("Maximum size can be 5MB");
+
+            string fileName = file.FileName;
+
+            // Save uploaded file temporaryly inside container
+            var tempPath = Path.Combine(Path.GetTempPath(), file.FileName);
+            using (var stream = System.IO.File.Create(tempPath))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // Save metadata to database
+            Document docModel = new Document()
+            {
+                FileName = fileName,
+                ByteSize = (int)fileSize
+            };
+
             try
             {
-                _context.Documents.Add(docModel);
+                // Upload document to MinIO
+                await _documentStorage.UploadFileAsync(file.FileName, tempPath);
+
+                _context.Documents.Add(docModel); // TODO: Check if filename already exists
                 _context.SaveChanges();
             }
             catch (Exception ex)
@@ -80,10 +106,15 @@ namespace PaperlessREST.Services
                 _logger.LogError(ex, "Failed to save the changes");
                 throw new FailedSaveException(ex);
             }
+            finally
+            {
+                // Delete temp file after upload
+                System.IO.File.Delete(tempPath);
+            }
 
             // Add document to queue
-            _logger.LogInformation($"Document {docModel.Name} sent to queue");
-            await _queueService.PublishAsync("ocr_queue", docModel);
+            _logger.LogInformation($"Document {fileName} sent to queue");
+            await _queueService.PublishAsync("ocr_queue", fileName);
 
             // Return created Document as DTO Object
             return CreatedAtAction(nameof(GetDocumentById), new { id = docModel.Id }, _mapper.Map<DocumentDto>(docModel));  // 201 Created
@@ -112,6 +143,8 @@ namespace PaperlessREST.Services
             {
                 _context.Documents.Remove(docModel);
                 _context.SaveChanges();
+
+                _documentStorage.DeleteFileAsync(docModel.FileName);
             }
             catch (Exception ex)
             {
@@ -126,7 +159,7 @@ namespace PaperlessREST.Services
         public IActionResult UpdateDocument([FromRoute] int id, [FromBody] DocumentDto docDto)
         {
             _logger.LogInformation($"Updating document with ID {id}");
-            
+
             if (id < 1)
             {
                 _logger.LogError($"Invalid ID: {id}");
@@ -141,12 +174,11 @@ namespace PaperlessREST.Services
                 return NotFound();    // 404 Not Found
             }
 
-            docModel.Name = docDto.Name;
-            docModel.Filetype = docDto.Filetype;
+            docModel.FileName = docDto.FileName;
             docModel.ByteSize = docDto.ByteSize;
-            docModel.CreatedAt = docDto.CreatedAt;
-            docModel.UpdatedAt = docDto.UpdatedAt;
-            
+            docModel.Summary = docDto.Summary;
+            docModel.LastModified = docDto.LastModified;
+
             try
             {
                 _context.SaveChanges();

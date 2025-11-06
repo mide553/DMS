@@ -1,32 +1,27 @@
-# Stage 1: Base runtime
+# -------- Base runtime image --------
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
 
-# Stage 2: Build
+# Install required native OCR dependencies
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    libleptonica-dev \
+    libtesseract-dev \
+    tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
+
+# -------- Build stage --------
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+COPY ["PaperlessServices/OcrWorker/OcrWorker.csproj", "PaperlessServices/OcrWorker/"]
+RUN dotnet restore "PaperlessServices/OcrWorker/OcrWorker.csproj"
 
-# Copy the shared library
-COPY PaperlessModels ./PaperlessModels
-
-# Copy OcrWorker project
-COPY PaperlessServices/OcrWorker ./PaperlessServices/OcrWorker
-
-# Set working directory to OcrWorker
-WORKDIR /src/PaperlessServices/OcrWorker
-
-# Restore dependencies (including PaperlessModels reference)
-RUN dotnet restore "OcrWorker.csproj"
-
-# Publish the worker
+COPY . .
+WORKDIR "/src/PaperlessServices/OcrWorker"
 RUN dotnet publish "OcrWorker.csproj" -c Release -o /app/publish
 
-# Stage 3: Final image
+# -------- Final stage --------
 FROM base AS final
 WORKDIR /app
-
-# Copy the published output
 COPY --from=build /app/publish .
-
-# Set entrypoint
 ENTRYPOINT ["dotnet", "OcrWorker.dll"]

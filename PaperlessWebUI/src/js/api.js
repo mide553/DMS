@@ -25,28 +25,24 @@ class ApiClient {
             },
         };
 
-        try {
-            const response = await fetch(url, finalOptions);
+        const response = await fetch(url, finalOptions);
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            // Handle empty responses (like DELETE)
-            if (response.status === 204) {
-                return null;
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                return await response.json();
-            }
-
-            return await response.text();
-        } catch (error) {
-            console.error('API request failed:', error);
-            throw error;
+        if (!response.ok) {
+            console.error('API request failed with status:', response.status);
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        // Handle empty responses (like DELETE)
+        if (response.status === 204) {
+            return null;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return await response.json();
+        }
+
+        return await response.text();
     }
 
     // GET
@@ -105,32 +101,14 @@ class DocumentService {
         }
     }
 
-    // Create new document
-    async createDocument(documentData) {
-        try {
-            const document = {
-                name: documentData.name,
-                filetype: documentData.filetype,
-                byteSize: parseInt(documentData.byteSize),
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-            return await this.apiClient.post('/documents', document);
-        } catch (error) {
-            console.error('Failed to create document:', error);
-            throw new Error('Failed to create document. Please check your input and try again.');
-        }
-    }
-
     // Update document
     async updateDocument(id, documentData) {
         try {
             const document = {
-                name: documentData.name,
-                filetype: documentData.filetype,
+                fileName: documentData.fileName,
                 byteSize: parseInt(documentData.byteSize),
-                createdAt: documentData.createdAt,
-                updatedAt: new Date().toISOString()
+                summary: documentData.summary || '',
+                lastModified: documentData.lastModified || new Date().toISOString()
             };
             return await this.apiClient.put(`/documents/${id}`, document);
         } catch (error) {
