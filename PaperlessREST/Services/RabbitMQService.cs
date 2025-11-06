@@ -49,12 +49,12 @@ namespace PaperlessREST.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError($"Failed to convert {document.Name} to json");
+                _logger.LogError($"Failed to convert {document.FileName} to json");
                 throw new FailedConvertException(typeof(Document).ToString(), typeof(JsonSerializer).ToString(), ex);
             }
 
             // Publish message
-            _logger.LogInformation($"Document {document.Name} in queue {queue} ready to be processed");
+            _logger.LogInformation($"Document {document.FileName} in queue {queue} ready to be processed");
             await _channel.BasicPublishAsync<BasicProperties>(
                 exchange: "",
                 routingKey: queue,

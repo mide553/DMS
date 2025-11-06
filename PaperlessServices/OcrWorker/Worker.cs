@@ -51,12 +51,12 @@ namespace OcrWorker
 
                     if (document is not null)
                     {
-                        _logger.LogInformation($"Processing document {document.Name}");
+                        _logger.LogInformation($"Processing document {document.FileName}");
                         await ProcessDocumentAsync(document, stoppingToken);
                     }
 
                     // Acknowledge message (deletes file)
-                    _logger.LogInformation($"Finished process on document {document.Name}");
+                    _logger.LogInformation($"Finished process on document {document.FileName}");
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 }
                 catch (JsonException ex)
@@ -86,7 +86,7 @@ namespace OcrWorker
         private Task ProcessDocumentAsync(Document document, CancellationToken token)
         {
             // Simulated OCR work
-            _logger.LogInformation($"Performing OCR on {document.Name}");
+            _logger.LogInformation($"Performing OCR on {document.FileName}");
             return Task.Delay(2000, token);
         }
 

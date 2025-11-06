@@ -63,7 +63,7 @@ namespace PaperlessREST.Services
             return Ok(doc); // 200 Ok
         }
 
-        [HttpPost]
+        [HttpPost("upload")]
         public async Task<IActionResult> UploadDocument([FromBody] DocumentDto docDto)
         {
             _logger.LogInformation($"Uploading new document");
@@ -82,7 +82,7 @@ namespace PaperlessREST.Services
             }
 
             // Add document to queue
-            _logger.LogInformation($"Document {docModel.Name} sent to queue");
+            _logger.LogInformation($"Document {docModel.FileName} sent to queue");
             await _queueService.PublishAsync("ocr_queue", docModel);
 
             // Return created Document as DTO Object
@@ -126,7 +126,7 @@ namespace PaperlessREST.Services
         public IActionResult UpdateDocument([FromRoute] int id, [FromBody] DocumentDto docDto)
         {
             _logger.LogInformation($"Updating document with ID {id}");
-            
+
             if (id < 1)
             {
                 _logger.LogError($"Invalid ID: {id}");
@@ -141,12 +141,11 @@ namespace PaperlessREST.Services
                 return NotFound();    // 404 Not Found
             }
 
-            docModel.Name = docDto.Name;
-            docModel.Filetype = docDto.Filetype;
+            docModel.FileName = docDto.FileName;
             docModel.ByteSize = docDto.ByteSize;
-            docModel.CreatedAt = docDto.CreatedAt;
-            docModel.UpdatedAt = docDto.UpdatedAt;
-            
+            docModel.Summary = docDto.Summary;
+            docModel.LastModified = docDto.LastModified;
+
             try
             {
                 _context.SaveChanges();
