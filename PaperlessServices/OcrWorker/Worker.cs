@@ -1,31 +1,37 @@
+using OcrWorker.Services;
+using OcrWorker.Exceptions;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
-using OcrWorker.Exceptions;
-using OcrWorker.Services;
-using Tesseract;
 
 namespace OcrWorker
 {
-    public class Worker : BackgroundService, IAsyncDisposable
+    public interface IWorker
+    {
+        public void ProcessDocument(string localPath);
+    }
+
+    public class Worker : BackgroundService, IWorker, IAsyncDisposable
     {
         private readonly IConnection _connection;
         private readonly IChannel _channel;
         private readonly IDocumentStorageService _documentStorage;
+        private readonly IDocumentExtractorService _documentExtractor;
         private readonly ILogger<Worker> _logger;
 
-        public Worker(IDocumentStorageService documentStorage, ILogger<Worker> logger)
+        public Worker(IDocumentStorageService documentStorage, IDocumentExtractorService documentExtractor, IConfiguration config, ILogger<Worker> logger)
         {
             var factory = new ConnectionFactory
             {
-                HostName = Environment.GetEnvironmentVariable("RABBITMQ_HOST"),
-                UserName = Environment.GetEnvironmentVariable("RABBITMQ_USER"),
-                Password = Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD")
+                HostName = config["RABBITMQ_HOST"],
+                UserName = config["RABBITMQ_USER"],
+                Password = config["RABBITMQ_PASSWORD"]
             };
             _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
 
             _documentStorage = documentStorage;
+            _documentExtractor = documentExtractor;
             _logger = logger;
         }
 
@@ -55,22 +61,21 @@ namespace OcrWorker
                     await _documentStorage.DownloadFileAsync(fileName, localPath);
 
                     // Perform OCR
-                    await ProcessDocumentAsync(localPath);
+                    ProcessDocument(localPath);
 
                     // Acknowledge message (deletes file)
-                    _logger.LogInformation($"Finished process on document {fileName}");
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error processing document message");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
-                    throw new OcrWorkerProcessException(ex);
-                }
-                finally
-                {
+
                     // Delete temp file after upload
-                    System.IO.File.Delete(localPath);
+                    if (Path.Exists(localPath)) 
+                        System.IO.File.Delete(localPath);
+
+                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
+                    throw new OcrWorkerProcessException(ex);
                 }
             };
 
@@ -85,25 +90,14 @@ namespace OcrWorker
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        private Task ProcessDocumentAsync(string localPath)
+        public void ProcessDocument(string localPath)
         {
-            // OCR Processing
-            try
-            {
-                using var engine = new TesseractEngine(@"./tessdata", "eng", EngineMode.Default);
-                using var img = Pix.LoadFromFile(localPath);
-                using var page = engine.Process(img);
-                var text = page.GetText();
-
-                string fileName = Path.GetFileName(localPath);
-                _logger.LogInformation($"OCR Output for {fileName}:\n{text}");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to convert images to text");
-                throw new Exception("Failed to convert images to text");
-            }
-            return Task.CompletedTask;
+            string fileName = Path.GetFileName(localPath);
+            
+            // Extract text from document
+            string text = _documentExtractor.ExtractDocument(localPath);
+            
+            _logger.LogInformation($"Finished process on document {fileName}");
         }
 
         public async ValueTask DisposeAsync()

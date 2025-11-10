@@ -2,6 +2,6 @@
 {
     public class OcrWorkerProcessException : Exception
     {
-        public OcrWorkerProcessException(Exception exception) : base($"Worker failed to process message: {exception}") { }
+        public OcrWorkerProcessException(Exception ex) : base($"Worker failed to process message", ex) { }
     }
 }
