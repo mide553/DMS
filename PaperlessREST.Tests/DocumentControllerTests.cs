@@ -82,6 +82,9 @@ public class DocumentControllerTests
         Assert.That(documents.Count, Is.EqualTo(0));
     }
 
+    #endregion
+    
+    #region GetDocumentById Tests
 
     [Test]
     public void GetDocumentById_WhenDocumentExists_ReturnsOkWithDocument()
@@ -103,9 +106,7 @@ public class DocumentControllerTests
     [Test]
     public void GetDocumentById_WhenDocumentDoesNotExist_ReturnsNotFound()
     {
-
         var result = _controller.GetDocumentById(999);
-
 
         Assert.That(result, Is.TypeOf<NotFoundResult>());
     }
@@ -124,6 +125,9 @@ public class DocumentControllerTests
         Assert.Throws<InvalidIdException>(() => _controller.GetDocumentById(-1));
     }
 
+    #endregion
+
+    #region UploadDocument Tests
 
     [Test]
     public async Task UploadDocument_PublishesToQueue_WithCorrectQueueName()
@@ -133,11 +137,11 @@ public class DocumentControllerTests
         _context.Documents.Add(document);
         _context.SaveChanges();
 
-        _mockQueueService.Setup(q => q.PublishAsync(It.IsAny<string>(), It.IsAny<Document>())).Returns(Task.CompletedTask);
+        _mockQueueService.Setup(q => q.PublishAsync(It.IsAny<string>(), It.IsAny<string>())).Returns(Task.CompletedTask);
 
-        await _mockQueueService.Object.PublishAsync("ocr_queue", document);
+        await _mockQueueService.Object.PublishAsync("ocr_queue", "test.pdf");
 
-        _mockQueueService.Verify(q => q.PublishAsync("ocr_queue", It.IsAny<Document>()), Times.Once);
+        _mockQueueService.Verify(q => q.PublishAsync("ocr_queue","test.pdf"), Times.Once);
     }
 
     #endregion

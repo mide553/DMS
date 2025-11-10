@@ -29,5 +29,5 @@
     <ProjectReference Include="..\PaperlessServices\OcrWorker\OcrWorker.csproj" />
   </ItemGroup>
 
-</Project>
+ </Project>
 
