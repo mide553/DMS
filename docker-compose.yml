@@ -42,7 +42,6 @@ services:
     image: rabbitmq:3-management-alpine
     container_name: RabbitMQ
     environment:
-      RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
     ports:
@@ -59,8 +58,8 @@ services:
 
   ocrworker:
     build:
-      context: .
-      dockerfile: ./PaperlessServices/OcrWorker/Dockerfile
+      context: ./PaperlessServices/OcrWorker
+      dockerfile: Dockerfile
     container_name: OcrWorker
     environment:
       ASPNETCORE_ENVIRONMENT: Development
@@ -74,6 +73,22 @@ services:
       rabbitmq:
         condition: service_healthy
       minio:
+        condition: service_healthy
+    networks:
+      - paperless-network
+
+  genaiworker:
+    container_name: GenAIWorker
+    build:
+      context: ./PaperlessServices/GenAIWorker
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    depends_on:
+      rabbitmq:
         condition: service_healthy
     networks:
       - paperless-network
@@ -99,6 +114,8 @@ services:
       db:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     networks:
       - paperless-network
