@@ -1,11 +1,12 @@
-﻿using RabbitMQ.Client;
+﻿using PaperlessREST.Exceptions;
+using RabbitMQ.Client;
 using System.Text;
 
 namespace PaperlessREST.Services
 {
     public interface IMessageQueueService
     {
-        Task PublishAsync(string queue, string message);
+        Task PublishAsync(string queueName, string message);
     }
 
     public class RabbitMQService : IMessageQueueService, IAsyncDisposable
@@ -14,13 +15,12 @@ namespace PaperlessREST.Services
         private readonly IChannel _channel;
         private readonly ILogger _logger;
 
-        public RabbitMQService(ILogger<RabbitMQService> logger)
+        public RabbitMQService(IConfiguration config, ILogger<RabbitMQService> logger)
         {
             var factory = new ConnectionFactory
             {
-                HostName = Environment.GetEnvironmentVariable("RABBITMQ_HOST"),
-                UserName = Environment.GetEnvironmentVariable("RABBITMQ_USER"),
-                Password = Environment.GetEnvironmentVariable("RABBITMQ_PASSWORD")
+                UserName = config["RABBITMQ_USER"] ?? throw new MissingConfigurationItemException("RabbitMQ User"),
+                Password = config["RABBITMQ_PASSWORD"] ?? throw new MissingConfigurationItemException("RabbitMQ Password")
             };
 
             _connection = factory.CreateConnectionAsync("PaperlessREST-Connection").GetAwaiter().GetResult();
@@ -28,11 +28,11 @@ namespace PaperlessREST.Services
             _logger = logger;
         }
 
-        public async Task PublishAsync(string queue, string message)
+        public async Task PublishAsync(string queueName, string message)
         {
             // Declare Queue
             await _channel.QueueDeclareAsync(
-                queue,
+                queueName,
                 durable: true,
                 exclusive: false,
                 autoDelete: false
@@ -42,13 +42,13 @@ namespace PaperlessREST.Services
             var body = Encoding.UTF8.GetBytes(message);
             await _channel.BasicPublishAsync<BasicProperties>(
                 exchange: "",
-                routingKey: queue,
+                routingKey: queueName,
                 mandatory: false,
                 basicProperties: new BasicProperties(),
                 body: body
             );
 
-            _logger.LogInformation($"{message} in queue {queue} ready to be processed");
+            _logger.LogInformation($"Message in queue ({queueName}) ready to be processed");
         }
 
         public async ValueTask DisposeAsync()

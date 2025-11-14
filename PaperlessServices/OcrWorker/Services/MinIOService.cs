@@ -17,9 +17,9 @@ namespace OcrWorker.Services
 
         public MinIOService(IConfiguration config, ILogger<MinIOService> logger)
         {
-            var endpoint = config["MINIO_ENDPOINT"];
-            var username = config["MINIO_ROOT_USER"];
-            var password = config["MINIO_ROOT_PASSWORD"];
+            string endpoint = config["MINIO_ENDPOINT"] ?? throw new MissingConfigurationItemException("MinIO Endpoint");
+            string username = config["MINIO_ROOT_USER"] ?? throw new MissingConfigurationItemException("MinIO User");
+            string password = config["MINIO_ROOT_PASSWORD"] ?? throw new MissingConfigurationItemException("MinIO Password");
 
             _client = new MinioClient()
                 .WithEndpoint(endpoint)

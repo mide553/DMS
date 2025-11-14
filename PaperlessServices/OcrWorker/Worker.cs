@@ -1,5 +1,5 @@
-using OcrWorker.Services;
 using OcrWorker.Exceptions;
+using OcrWorker.Services;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -23,9 +23,9 @@ namespace OcrWorker
         {
             var factory = new ConnectionFactory
             {
-                HostName = config["RABBITMQ_HOST"],
-                UserName = config["RABBITMQ_USER"],
-                Password = config["RABBITMQ_PASSWORD"]
+                HostName = config["RABBITMQ_HOST"] ?? throw new MissingConfigurationItemException("RabbitMQ Host"),
+                UserName = config["RABBITMQ_USER"] ?? throw new MissingConfigurationItemException("RabbitMQ User"),
+                Password = config["RABBITMQ_PASSWORD"] ?? throw new MissingConfigurationItemException("RabbitMQ Password")
             };
             _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
@@ -63,7 +63,7 @@ namespace OcrWorker
                     // Perform OCR
                     ProcessDocument(localPath);
 
-                    // Acknowledge message (deletes file)
+                    // Acknowledge message (deletes from queue)
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 }
                 catch (Exception ex)
@@ -83,8 +83,7 @@ namespace OcrWorker
             await _channel.BasicConsumeAsync(
                 queue: queueName,
                 autoAck: false,
-                consumer:
-                consumer
+                consumer: consumer
             );
 
             await Task.Delay(Timeout.Infinite, stoppingToken);
@@ -96,13 +95,13 @@ namespace OcrWorker
             
             // Extract text from document
             string text = _documentExtractor.ExtractDocument(localPath);
-            
+
             _logger.LogInformation($"Finished process on document {fileName}");
         }
 
         public async ValueTask DisposeAsync()
         {
-            _logger.LogInformation("Stopping RabbitMQ worker...");
+            _logger.LogInformation("Stopping OCR worker...");
             // Close channel
             if (_channel is not null)
                 await _channel.CloseAsync();

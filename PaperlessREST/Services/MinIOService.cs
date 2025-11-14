@@ -1,4 +1,5 @@
-﻿using Minio;
+﻿using PaperlessREST.Exceptions;
+using Minio;
 using Minio.DataModel.Args;
 
 namespace PaperlessREST.Services
@@ -15,11 +16,11 @@ namespace PaperlessREST.Services
         private readonly ILogger _logger;
         private readonly string _bucketName = "documents";
 
-        public MinIOService(ILogger<MinIOService> logger)
+        public MinIOService(IConfiguration config, ILogger<MinIOService> logger)
         {
-            var endpoint = Environment.GetEnvironmentVariable("MINIO_ENDPOINT");
-            var username = Environment.GetEnvironmentVariable("MINIO_ROOT_USER");
-            var password = Environment.GetEnvironmentVariable("MINIO_ROOT_PASSWORD");
+            string endpoint = config["MINIO_ENDPOINT"] ?? throw new MissingConfigurationItemException("MinIO Endpoint");
+            string username = config["MINIO_ROOT_USER"] ?? throw new MissingConfigurationItemException("MinIO User");
+            string password = config["MINIO_ROOT_PASSWORD"] ?? throw new MissingConfigurationItemException("MinIO Password");
 
             _client = new MinioClient()
                 .WithEndpoint(endpoint)
