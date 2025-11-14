@@ -98,6 +98,11 @@ namespace PaperlessREST.Services
                 // Upload document to MinIO
                 await _documentStorage.UploadFileAsync(file.FileName, tempPath);
 
+                // Add document to queue
+                string queueName = "ocr_queue";
+                await _queueService.PublishAsync(queueName, fileName);
+                _logger.LogInformation($"Message sent to queue {queueName}");
+
                 _context.Documents.Add(docModel); // TODO: Check if filename already exists
                 _context.SaveChanges();
             }
@@ -111,10 +116,6 @@ namespace PaperlessREST.Services
                 // Delete temp file after upload
                 System.IO.File.Delete(tempPath);
             }
-
-            // Add document to queue
-            _logger.LogInformation($"Document {fileName} sent to queue");
-            await _queueService.PublishAsync("ocr_queue", fileName);
 
             // Return created Document as DTO Object
             return CreatedAtAction(nameof(GetDocumentById), new { id = docModel.Id }, _mapper.Map<DocumentDto>(docModel));  // 201 Created

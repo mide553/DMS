@@ -1,25 +1,23 @@
-using OcrWorker.Exceptions;
-using OcrWorker.Services;
+using GenAIWorker.Services;
+using GenAIWorker.Exceptions;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 
-namespace OcrWorker
+namespace GenAIWorker
 {
     public interface IWorker
     {
-        public Task ProcessDocumentAsync(string localPath);
+        public Task ProcessText(string text);
     }
-
-    public class Worker : BackgroundService, IWorker, IAsyncDisposable
+    public class Worker : BackgroundService, IAsyncDisposable
     {
         private readonly IConnection _connection;
         private readonly IChannel _channel;
-        private readonly IDocumentStorageService _documentStorage;
-        private readonly IDocumentExtractorService _documentExtractor;
+        private readonly ISummarizer _summarizer;
         private readonly ILogger<Worker> _logger;
 
-        public Worker(IDocumentStorageService documentStorage, IDocumentExtractorService documentExtractor, IConfiguration config, ILogger<Worker> logger)
+        public Worker(ISummarizer summarizer, IConfiguration config, ILogger<Worker> logger)
         {
             var factory = new ConnectionFactory
             {
@@ -30,15 +28,14 @@ namespace OcrWorker
             _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
 
-            _documentStorage = documentStorage;
-            _documentExtractor = documentExtractor;
+            _summarizer = summarizer;
             _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             // Declare Queue
-            string queueName = "ocr_queue";
+            string queueName = "genai_queue";
             await _channel.QueueDeclareAsync(
                 queue: queueName,
                 durable: true,
@@ -51,62 +48,50 @@ namespace OcrWorker
             consumer.ReceivedAsync += async (model, ea) =>
             {
                 // Get message
-                var fileName = Encoding.UTF8.GetString(ea.Body.ToArray());
-                _logger.LogInformation($"Received OCR job for {fileName}");
-
-                var localPath = Path.Combine("/tmp", fileName);
+                var text = Encoding.UTF8.GetString(ea.Body.ToArray());
+                _logger.LogInformation($"Received summarizing job");
+                
                 try
                 {
-                    // Download file
-                    await _documentStorage.DownloadFileAsync(fileName, localPath);
-
-                    // Perform OCR
-                    await ProcessDocumentAsync(localPath);
-
-                    // Acknowledge message (deletes from queue)
-                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    // Process text
+                    await ProcessText(text);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error processing document message");
-
-                    // Delete temp file after upload
-                    if (Path.Exists(localPath)) 
-                        System.IO.File.Delete(localPath);
-
-                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
-                    throw new OcrWorkerProcessException(ex);
+                    throw;
                 }
+                
+                // Acknowledge message (deletes from queue)
+                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             };
 
             // Consume message from Queue
             await _channel.BasicConsumeAsync(
                 queue: queueName,
                 autoAck: false,
-                consumer: consumer
+                consumer:
+                consumer
             );
 
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        public async Task ProcessDocumentAsync(string localPath)
+        public async Task ProcessText(string text)
         {
-            string fileName = Path.GetFileName(localPath);
-            
-            // Extract text from document
-            string text = _documentExtractor.ExtractDocument(localPath);
+            // Summarize text
+            string summary = await _summarizer.SummarizeTextAsync(text);
 
-            // Send text to summarizer
-            await PublishForSummarizer(text);
-            _logger.LogInformation($"Finished process on document {fileName}");
+            // Send summary to api
+            await PublishForApiAsync(summary);
+            _logger.LogInformation($"Finished process on text");
         }
 
-        private async Task PublishForSummarizer(string message)
+        private async Task PublishForApiAsync(string message)
         {
             // Declare Queue
-            string summarizerQueueName = "genai_queue";
+            string resultQueueName = "result_queue";
             await _channel.QueueDeclareAsync(
-                summarizerQueueName,
+                resultQueueName,
                 durable: true,
                 exclusive: false,
                 autoDelete: false
@@ -116,17 +101,17 @@ namespace OcrWorker
             var body = Encoding.UTF8.GetBytes(message);
             await _channel.BasicPublishAsync<BasicProperties>(
                 exchange: "",
-                routingKey: summarizerQueueName,
+                routingKey: resultQueueName,
                 mandatory: false,
                 basicProperties: new BasicProperties(),
                 body: body
             );
-            _logger.LogInformation($"Text in queue {summarizerQueueName} ready to be summarized");
+            _logger.LogInformation($"Summary in queue ready to be saved");
         }
 
         public async ValueTask DisposeAsync()
         {
-            _logger.LogInformation("Stopping OCR worker...");
+            _logger.LogInformation("Stopping GenAI worker...");
             // Close channel
             if (_channel is not null)
                 await _channel.CloseAsync();

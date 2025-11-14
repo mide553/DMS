@@ -42,9 +42,15 @@ namespace OcrWorker.Services
                 using var engine = new TesseractEngine("/usr/share/tesseract-ocr/5/tessdata", "eng", EngineMode.Default);
                 using var img = Pix.LoadFromFile(localPath);
                 using var page = engine.Process(img);
-                var text = page.GetText();
+                string text = page.GetText();
 
-                _logger.LogInformation($"OCR Output for {fileName}:\n{text}");
+                if (String.IsNullOrEmpty(text))
+                {
+                    _logger.LogError($"Failed to extract text from {fileName}");
+                    throw new Exception($"Failed to extract text from {fileName}");
+                }
+
+                _logger.LogInformation($"Extracted text from {fileName}");
                 return text;
             }
             catch (Exception ex)
