@@ -1,26 +1,24 @@
-using OcrWorker.Exceptions;
-using OcrWorker.Services;
+using GenAIWorker.Exceptions;
+using GenAIWorker.Services;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
 
-namespace OcrWorker
+namespace GenAIWorker
 {
     public interface IWorker
     {
-        public Task<string> ProcessDocumentAsync(string localPath);
+        public Task ProcessText(string text);
     }
-
-    public class Worker : BackgroundService, IWorker, IAsyncDisposable
+    public class Worker : BackgroundService, IAsyncDisposable
     {
         private readonly IConnection _connection;
         private readonly IChannel _channel;
-        private readonly IDocumentStorageService _documentStorage;
-        private readonly IDocumentExtractorService _documentExtractor;
+        private readonly ISummarizer _summarizer;
         private readonly ILogger<Worker> _logger;
 
-        public Worker(IDocumentStorageService documentStorage, IDocumentExtractorService documentExtractor, IConfiguration config, ILogger<Worker> logger)
+        public Worker(ISummarizer summarizer, IConfiguration config, ILogger<Worker> logger)
         {
             var factory = new ConnectionFactory
             {
@@ -31,15 +29,14 @@ namespace OcrWorker
             _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
 
-            _documentStorage = documentStorage;
-            _documentExtractor = documentExtractor;
+            _summarizer = summarizer;
             _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             // Declare Queue
-            string queueName = "ocr_queue";
+            string queueName = "genai_queue";
             await _channel.QueueDeclareAsync(
                 queue: queueName,
                 durable: true,
@@ -58,51 +55,43 @@ namespace OcrWorker
                     var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
 
                     if (!message.TryGetValue("id", out var idString) ||
-                    !int.TryParse(idString, out int id))
+                        !int.TryParse(idString, out int id))
                     {
                         throw new InvalidMessageException("id");
                     }
 
-                    if (!message.TryGetValue("filename", out var fileName) ||
-                        string.IsNullOrWhiteSpace(fileName))
+                    if (!message.TryGetValue("text", out var text) ||
+                        string.IsNullOrWhiteSpace(text))
                     {
-                        throw new InvalidMessageException("filename");
+                        throw new InvalidMessageException("text");
                     }
 
-                    _logger.LogInformation($"Received OCR job for {fileName}");
+                    _logger.LogInformation($"Received summarizing job for document {id}");
 
-                    var localPath = Path.Combine("/tmp", fileName);
                     try
                     {
-                        // Download file
-                        await _documentStorage.DownloadFileAsync(fileName, localPath);
+                        // Process text
+                        string summary = await ProcessText(text);
 
-                        // Perform OCR
-                        string text = await ProcessDocumentAsync(localPath);
-
-                        // Send text to summarizer
-                        await PublishForSummarizer(id, text);
-                    
-                        // Acknowledge message (deletes from queue)
-                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                        // Send summary to api
+                        await PublishForApiAsync(id, summary);
                     }
                     catch (Exception ex)
                     {
-                        // Delete temp file after upload
-                        if (Path.Exists(localPath)) 
-                            System.IO.File.Delete(localPath);
-
-                        throw new OcrWorkerProcessException(ex);
+                        throw new GenaiWorkerProcessException(ex);
                     }
+
+                    // Acknowledge message (deletes from queue)
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 }
                 catch (InvalidMessageException ex)
                 {
                     _logger.LogError(ex, "Invalid message received - discarding");
                     await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
                 }
-                catch (OcrWorkerProcessException ex)
+                catch (GenaiWorkerProcessException ex)
                 {
-                    _logger.LogError(ex, "Error processing message");
+                    _logger.LogError(ex, "Error summarizing document text");
                     await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
                 }
                 catch (Exception ex)
@@ -116,29 +105,28 @@ namespace OcrWorker
             await _channel.BasicConsumeAsync(
                 queue: queueName,
                 autoAck: false,
-                consumer: consumer
+                consumer:
+                consumer
             );
 
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        public async Task<string> ProcessDocumentAsync(string localPath)
+        public async Task<string> ProcessText(string text)
         {
-            string fileName = Path.GetFileName(localPath);
-            
-            // Extract text from document
-            string text = _documentExtractor.ExtractDocument(localPath);
+            // Summarize text
+            string summary = await _summarizer.SummarizeTextAsync(text);
+            _logger.LogInformation($"Finished process on text");
 
-            _logger.LogInformation($"Finished process on document {fileName}");
-            return text;
+            return summary;
         }
 
-        private async Task PublishForSummarizer(int id, string text)
+        private async Task PublishForApiAsync(int id, string summary)
         {
             // Declare Queue
-            string summarizerQueueName = "genai_queue";
+            string resultQueueName = "result_queue";
             await _channel.QueueDeclareAsync(
-                summarizerQueueName,
+                resultQueueName,
                 durable: true,
                 exclusive: false,
                 autoDelete: false
@@ -148,7 +136,7 @@ namespace OcrWorker
             var payload = new Dictionary<string, string>
             {
                 { "id", id.ToString() },
-                { "text", text }
+                { "summary", summary }
             };
 
             var json = JsonSerializer.Serialize(payload);
@@ -156,17 +144,17 @@ namespace OcrWorker
 
             await _channel.BasicPublishAsync<BasicProperties>(
                 exchange: "",
-                routingKey: summarizerQueueName,
+                routingKey: resultQueueName,
                 mandatory: false,
                 basicProperties: new BasicProperties(),
                 body: body
             );
-            _logger.LogInformation($"Text in queue {summarizerQueueName} ready to be summarized");
+            _logger.LogInformation($"Summary in queue ready to be saved");
         }
 
         public async ValueTask DisposeAsync()
         {
-            _logger.LogInformation("Stopping OCR worker...");
+            _logger.LogInformation("Stopping GenAI worker...");
             // Close channel
             if (_channel is not null)
                 await _channel.CloseAsync();

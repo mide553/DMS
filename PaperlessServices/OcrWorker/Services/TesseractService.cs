@@ -30,27 +30,42 @@ namespace OcrWorker.Services
                 throw new UnsupportedFileExtensionException(extension);
             }
 
-            // Convert PDF to PNG
-            if (Path.GetExtension(fileName) == ".pdf")
-            {
-                localPath = PdfToPngConverter(localPath);
-            }
-
             // OCR Processing
             try
             {
+                // Convert PDF to PNG
+                if (Path.GetExtension(fileName) == ".pdf")
+                {
+                    localPath = PdfToPngConverter(localPath);
+                }
+
                 using var engine = new TesseractEngine("/usr/share/tesseract-ocr/5/tessdata", "eng", EngineMode.Default);
                 using var img = Pix.LoadFromFile(localPath);
                 using var page = engine.Process(img);
-                var text = page.GetText();
+                string text = page.GetText();
 
-                _logger.LogInformation($"OCR Output for {fileName}:\n{text}");
+                if (String.IsNullOrEmpty(text))
+                {
+                    throw new ImageToTextConverterException(fileName);
+                }
+
+                _logger.LogInformation($"Extracted text from {fileName}");
                 return text;
+            }
+            catch (GhostscriptPdfToImageConverterException ex)
+            {
+                _logger.LogError(ex, $"Ghostscript failed to convert PDF {fileName} to image");
+                throw new TesseractExtractorException(ex);
+            }
+            catch (ImageToTextConverterException ex)
+            {
+                _logger.LogError(ex, $"Failed to extract text from document {fileName}");
+                throw new TesseractExtractorException(ex);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Failed to convert image to text ({fileName})");
-                throw new ImageToTextConverterException(fileName);
+                _logger.LogError(ex, "Unexpected error");
+                throw new TesseractExtractorException(ex);
             }
         }
 
@@ -77,7 +92,6 @@ namespace OcrWorker.Services
                 if (proc.ExitCode != 0)
                 {
                     string err = proc.StandardError.ReadToEnd();
-                    _logger.LogError("Ghostscript failed to convert PDF to image");
                     throw new GhostscriptPdfToImageConverterException(Path.GetFileName(localPath));
                 }
             }

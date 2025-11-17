@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-GenAIWorker-e5179b4e-d1e8-424e-8e54-1f6c8f2f32ac</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+	<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+	<PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
+	<PackageReference Include="RestSharp" Version="112.1.0" />
+  </ItemGroup>
+</Project>

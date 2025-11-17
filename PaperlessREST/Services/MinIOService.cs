@@ -1,4 +1,5 @@
-﻿using Minio;
+﻿using PaperlessREST.Exceptions;
+using Minio;
 using Minio.DataModel.Args;
 
 namespace PaperlessREST.Services
@@ -7,6 +8,7 @@ namespace PaperlessREST.Services
     {
         public Task UploadFileAsync(string documentName, string filePath);
         public Task DeleteFileAsync(string documentName);
+        public Task<bool> FileExistsAsync(string documentName);
     }
     
     public class MinIOService : IDocumentStorageService
@@ -15,11 +17,11 @@ namespace PaperlessREST.Services
         private readonly ILogger _logger;
         private readonly string _bucketName = "documents";
 
-        public MinIOService(ILogger<MinIOService> logger)
+        public MinIOService(IConfiguration config, ILogger<MinIOService> logger)
         {
-            var endpoint = Environment.GetEnvironmentVariable("MINIO_ENDPOINT");
-            var username = Environment.GetEnvironmentVariable("MINIO_ROOT_USER");
-            var password = Environment.GetEnvironmentVariable("MINIO_ROOT_PASSWORD");
+            string endpoint = config["MINIO_ENDPOINT"] ?? throw new MissingConfigurationItemException("MinIO Endpoint");
+            string username = config["MINIO_ROOT_USER"] ?? throw new MissingConfigurationItemException("MinIO User");
+            string password = config["MINIO_ROOT_PASSWORD"] ?? throw new MissingConfigurationItemException("MinIO Password");
 
             _client = new MinioClient()
                 .WithEndpoint(endpoint)
@@ -63,6 +65,21 @@ namespace PaperlessREST.Services
             {
                 _logger.LogError(ex, $"Failed to delete {documentName} from MinIO.");
                 throw;
+            }
+        }
+
+        public async Task<bool> FileExistsAsync(string documentName)
+        {
+            try
+            {
+                await _client.StatObjectAsync(new StatObjectArgs()
+                    .WithBucket(_bucketName)
+                    .WithObject(documentName));
+                return true;
+            }
+            catch (Minio.Exceptions.ObjectNotFoundException)
+            {
+                return false;
             }
         }
     }

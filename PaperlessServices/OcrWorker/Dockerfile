@@ -20,11 +20,11 @@ WORKDIR /app
 # -------- Build stage --------
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY ["PaperlessServices/OcrWorker/OcrWorker.csproj", "PaperlessServices/OcrWorker/"]
-RUN dotnet restore "PaperlessServices/OcrWorker/OcrWorker.csproj"
+COPY ["OcrWorker.csproj", "."]
+RUN dotnet restore "OcrWorker.csproj"
 
 COPY . .
-WORKDIR "/src/PaperlessServices/OcrWorker"
+WORKDIR "/src/"
 RUN dotnet publish "OcrWorker.csproj" -c Release -o /app/publish
 
 # -------- Final stage --------
