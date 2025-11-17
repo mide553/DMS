@@ -1,12 +1,13 @@
 ﻿using PaperlessREST.Exceptions;
 using RabbitMQ.Client;
 using System.Text;
+using System.Text.Json;
 
 namespace PaperlessREST.Services
 {
     public interface IMessageQueueService
     {
-        Task PublishAsync(string queueName, string message);
+        Task PublishAsync(int id, string message);
     }
 
     public class RabbitMQService : IMessageQueueService, IAsyncDisposable
@@ -29,8 +30,10 @@ namespace PaperlessREST.Services
             _logger = logger;
         }
 
-        public async Task PublishAsync(string queueName, string message)
+        public async Task PublishAsync(int id, string fileName)
         {
+            string queueName = "ocr_queue";
+
             // Declare Queue
             await _channel.QueueDeclareAsync(
                 queueName,
@@ -38,9 +41,18 @@ namespace PaperlessREST.Services
                 exclusive: false,
                 autoDelete: false
             );
-            
+
             // Publish message
-            var body = Encoding.UTF8.GetBytes(message);
+            var payload = new Dictionary<string, string>
+            {
+                { "id", id.ToString() },
+                { "filename", fileName }
+
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            var body = Encoding.UTF8.GetBytes(json);
+
             await _channel.BasicPublishAsync<BasicProperties>(
                 exchange: "",
                 routingKey: queueName,

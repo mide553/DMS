@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PaperlessREST.Exceptions;
+using PaperlessREST.Services;
 using PaperlessModels.Models;
 using PaperlessModels.DTOs;
 

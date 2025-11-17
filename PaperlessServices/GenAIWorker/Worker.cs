@@ -1,8 +1,9 @@
-using GenAIWorker.Services;
 using GenAIWorker.Exceptions;
+using GenAIWorker.Services;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
+using System.Text.Json;
 
 namespace GenAIWorker
 {
@@ -47,22 +48,57 @@ namespace GenAIWorker
             var consumer = new AsyncEventingBasicConsumer(_channel);
             consumer.ReceivedAsync += async (model, ea) =>
             {
-                // Get message
-                var text = Encoding.UTF8.GetString(ea.Body.ToArray());
-                _logger.LogInformation($"Received summarizing job");
-                
                 try
                 {
-                    // Process text
-                    await ProcessText(text);
+                    // Get message
+                    var json = Encoding.UTF8.GetString(ea.Body.ToArray());
+                    var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+
+                    if (!message.TryGetValue("id", out var idString) ||
+                        !int.TryParse(idString, out int id))
+                    {
+                        throw new InvalidMessageException("id");
+                    }
+
+                    if (!message.TryGetValue("text", out var text) ||
+                        string.IsNullOrWhiteSpace(text))
+                    {
+                        throw new InvalidMessageException("text");
+                    }
+
+                    _logger.LogInformation($"Received summarizing job for document {id}");
+
+                    try
+                    {
+                        // Process text
+                        string summary = await ProcessText(text);
+
+                        // Send summary to api
+                        await PublishForApiAsync(id, summary);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new GenaiWorkerProcessException(ex);
+                    }
+
+                    // Acknowledge message (deletes from queue)
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                }
+                catch (InvalidMessageException ex)
+                {
+                    _logger.LogError(ex, "Invalid message received - discarding");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+                }
+                catch (GenaiWorkerProcessException ex)
+                {
+                    _logger.LogError(ex, "Error summarizing document text");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
                 }
                 catch (Exception ex)
                 {
-                    throw;
+                    _logger.LogError(ex, "Unexpected error");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
                 }
-                
-                // Acknowledge message (deletes from queue)
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
             };
 
             // Consume message from Queue
@@ -76,17 +112,16 @@ namespace GenAIWorker
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        public async Task ProcessText(string text)
+        public async Task<string> ProcessText(string text)
         {
             // Summarize text
             string summary = await _summarizer.SummarizeTextAsync(text);
-
-            // Send summary to api
-            await PublishForApiAsync(summary);
             _logger.LogInformation($"Finished process on text");
+
+            return summary;
         }
 
-        private async Task PublishForApiAsync(string message)
+        private async Task PublishForApiAsync(int id, string summary)
         {
             // Declare Queue
             string resultQueueName = "result_queue";
@@ -98,7 +133,15 @@ namespace GenAIWorker
             );
 
             // Publish message
-            var body = Encoding.UTF8.GetBytes(message);
+            var payload = new Dictionary<string, string>
+            {
+                { "id", id.ToString() },
+                { "summary", summary }
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            var body = Encoding.UTF8.GetBytes(json);
+
             await _channel.BasicPublishAsync<BasicProperties>(
                 exchange: "",
                 routingKey: resultQueueName,

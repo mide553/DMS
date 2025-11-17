@@ -3,12 +3,13 @@ using OcrWorker.Services;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
+using System.Text.Json;
 
 namespace OcrWorker
 {
     public interface IWorker
     {
-        public Task ProcessDocumentAsync(string localPath);
+        public Task<string> ProcessDocumentAsync(string localPath);
     }
 
     public class Worker : BackgroundService, IWorker, IAsyncDisposable
@@ -50,32 +51,64 @@ namespace OcrWorker
             var consumer = new AsyncEventingBasicConsumer(_channel);
             consumer.ReceivedAsync += async (model, ea) =>
             {
-                // Get message
-                var fileName = Encoding.UTF8.GetString(ea.Body.ToArray());
-                _logger.LogInformation($"Received OCR job for {fileName}");
-
-                var localPath = Path.Combine("/tmp", fileName);
                 try
                 {
-                    // Download file
-                    await _documentStorage.DownloadFileAsync(fileName, localPath);
+                    // Get message
+                    var json = Encoding.UTF8.GetString(ea.Body.ToArray());
+                    var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
 
-                    // Perform OCR
-                    await ProcessDocumentAsync(localPath);
+                    if (!message.TryGetValue("id", out var idString) ||
+                    !int.TryParse(idString, out int id))
+                    {
+                        throw new InvalidMessageException("id");
+                    }
 
-                    // Acknowledge message (deletes from queue)
-                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    if (!message.TryGetValue("filename", out var fileName) ||
+                        string.IsNullOrWhiteSpace(fileName))
+                    {
+                        throw new InvalidMessageException("filename");
+                    }
+
+                    _logger.LogInformation($"Received OCR job for {fileName}");
+
+                    var localPath = Path.Combine("/tmp", fileName);
+                    try
+                    {
+                        // Download file
+                        await _documentStorage.DownloadFileAsync(fileName, localPath);
+
+                        // Perform OCR
+                        string text = await ProcessDocumentAsync(localPath);
+
+                        // Send text to summarizer
+                        await PublishForSummarizer(id, text);
+                    
+                        // Acknowledge message (deletes from queue)
+                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Delete temp file after upload
+                        if (Path.Exists(localPath)) 
+                            System.IO.File.Delete(localPath);
+
+                        throw new OcrWorkerProcessException(ex);
+                    }
+                }
+                catch (InvalidMessageException ex)
+                {
+                    _logger.LogError(ex, "Invalid message received - discarding");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+                }
+                catch (OcrWorkerProcessException ex)
+                {
+                    _logger.LogError(ex, "Error processing message");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error processing document message");
-
-                    // Delete temp file after upload
-                    if (Path.Exists(localPath)) 
-                        System.IO.File.Delete(localPath);
-
-                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
-                    throw new OcrWorkerProcessException(ex);
+                    _logger.LogError(ex, "Unexpected error");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
                 }
             };
 
@@ -89,19 +122,18 @@ namespace OcrWorker
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        public async Task ProcessDocumentAsync(string localPath)
+        public async Task<string> ProcessDocumentAsync(string localPath)
         {
             string fileName = Path.GetFileName(localPath);
             
             // Extract text from document
             string text = _documentExtractor.ExtractDocument(localPath);
 
-            // Send text to summarizer
-            await PublishForSummarizer(text);
             _logger.LogInformation($"Finished process on document {fileName}");
+            return text;
         }
 
-        private async Task PublishForSummarizer(string message)
+        private async Task PublishForSummarizer(int id, string text)
         {
             // Declare Queue
             string summarizerQueueName = "genai_queue";
@@ -113,7 +145,15 @@ namespace OcrWorker
             );
 
             // Publish message
-            var body = Encoding.UTF8.GetBytes(message);
+            var payload = new Dictionary<string, string>
+            {
+                { "id", id.ToString() },
+                { "text", text }
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            var body = Encoding.UTF8.GetBytes(json);
+
             await _channel.BasicPublishAsync<BasicProperties>(
                 exchange: "",
                 routingKey: summarizerQueueName,

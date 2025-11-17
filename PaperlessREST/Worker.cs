@@ -1,26 +1,26 @@
-using PaperlessREST.Exceptions;
-using PaperlessModels.DTOs;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
+using PaperlessModels.DTOs;
+using PaperlessREST.Services;
+using PaperlessREST.Exceptions;
 
 namespace PaperlessREST
 {
     public interface IWorker
     {
-        public Task ProcessDocumentAsync(string fileName, string summary);
+        public Task ProcessDocumentAsync(int id, string summary);
     }
 
     public class Worker : BackgroundService, IWorker, IAsyncDisposable
     {
         private readonly IConnection _connection;
         private readonly IChannel _channel;
-        //private readonly IDocumentController _documentController;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<Worker> _logger;
 
-        //public Worker(IDocumentController documentController, IConfiguration config, ILogger<Worker> logger)
-        public Worker(IConfiguration config, ILogger<Worker> logger)
+        public Worker(IServiceProvider serviceProvider, IConfiguration config, ILogger<Worker> logger)
         {
             var factory = new ConnectionFactory
             {
@@ -31,7 +31,7 @@ namespace PaperlessREST
 
             _connection = factory.CreateConnectionAsync("PaperlessREST-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
-            //_documentController = documentController;
+            _serviceProvider = serviceProvider;
 
             _logger = logger;
         }
@@ -51,50 +51,53 @@ namespace PaperlessREST
             var consumer = new AsyncEventingBasicConsumer(_channel);
             consumer.ReceivedAsync += async (model, ea) =>
             {
-                // Get message
-                // TODO json machen mit filename und summary?
-                var json = Encoding.UTF8.GetString(ea.Body.ToArray());
-                var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                try
+                {
+                    // Get message
+                    var json = Encoding.UTF8.GetString(ea.Body.ToArray());
+                    var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
 
-                int id = Int32.Parse(message["id"]);
-                string summary = message["summary"];
+                    if (!message.TryGetValue("id", out var idString) ||
+                    !int.TryParse(idString, out int id))
+                    {
+                        throw new InvalidMessageException("id");
+                    }
 
-                //if (String.IsNullOrEmpty(fileName) || String.IsNullOrEmpty(summary)
-                //{
-                //    // TODO
-                //}
+                    if (!message.TryGetValue("summary", out var summary) ||
+                        string.IsNullOrWhiteSpace(summary))
+                    {
+                        throw new InvalidMessageException("summary");
+                    }
 
-        // {"id":"1","summary":"The document states that it is a sample text."}
+                    _logger.LogInformation($"Received summary for document {id}");
 
-                // TODO
-                _logger.LogInformation($"Received summary for id {id}:\n{summary}");
-
+                    try
+                    {
+                        // Save summary
+                        await ProcessDocumentAsync(id, summary);
                 
-                DocumentDto documentDto = new DocumentDto { Summary = summary };
-
-                //Controllers.DocumentController controller = new Controllers.DocumentController();
-
-                //_documentController.UpdateDocument(id, documentDto);
-
-                await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-
-                //_logger.LogInformation($"Received summary for {fileName}");
-
-                //try
-                //{
-                //    // Add summary to document
-                //    await ProcessDocumentAsync(fileName, summary);
-
-                //    // Acknowledge message (deletes from queue)
-                //    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                //}
-                //catch (Exception ex)
-                //{
-                //    _logger.LogError(ex, "Error saving summary");
-
-                //    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
-                //    throw new OcrWorkerProcessException(ex);
-                //}
+                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new UpdateSummaryException(ex);
+                    }
+                }
+                catch (InvalidMessageException ex)
+                {
+                    _logger.LogError(ex, "Invalid message received - discarding");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+                }
+                catch (UpdateSummaryException ex)
+                {
+                    _logger.LogError(ex, "Failed to update document summary");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Unexpected error");
+                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
+                }
             };
 
             // Consume message from Queue
@@ -107,10 +110,36 @@ namespace PaperlessREST
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        public async Task ProcessDocumentAsync(string fileName, string summary)
+        public async Task ProcessDocumentAsync(int id, string summary)
         {
-            
-            _logger.LogInformation($"Saved summary to document {fileName}");
+            try
+            {
+                // Create new DI scope for scoped service DocumentService
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+
+                    // Get document to update
+                    DocumentDto currDoc = await documentService.GetDocumentByIdAsync(id);
+                    
+                    // Add summary to document
+                    DocumentDto doc = new DocumentDto 
+                    { 
+                        FileName = currDoc.FileName,
+                        ByteSize = currDoc.ByteSize,
+                        LastModified = currDoc.LastModified,
+                        Summary = summary 
+                    };
+
+                    await documentService.UpdateDocumentAsync(id, doc);
+
+                    _logger.LogInformation($"Saved summary to document {id}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Worker encountered an error");
+            }
         }
 
         public async ValueTask DisposeAsync()

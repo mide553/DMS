@@ -1,13 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.EntityFrameworkCore;
 using AutoMapper;
-using PaperlessREST.Services;
 using PaperlessREST.Data;
 using PaperlessREST.Exceptions;
 using PaperlessModels.Models;
 using PaperlessModels.DTOs;
-using Microsoft.EntityFrameworkCore;
 
-namespace PaperlessREST.Controllers
+namespace PaperlessREST.Services
 {
     public interface IDocumentService
     {
@@ -18,7 +16,7 @@ namespace PaperlessREST.Controllers
         public Task<DocumentDto> UpdateDocumentAsync(int id, DocumentDto docDto);
     }
 
-    public class DocumentService : ControllerBase, IDocumentService
+    public class DocumentService : IDocumentService
     {
         private readonly ApplicationDBContext _context;
         private readonly IMapper _mapper;
@@ -39,7 +37,7 @@ namespace PaperlessREST.Controllers
         {
             _logger.LogInformation("Fetching all documents");
             List<Document> docs = await _context.Documents.ToListAsync();
-            
+
             return docs;
         }
 
@@ -54,7 +52,7 @@ namespace PaperlessREST.Controllers
         public async Task<Document> UploadDocumentAsync(IFormFile file)
         {
             _logger.LogInformation($"Uploading new document");
-            
+
             // Check if filename already exists
             string fileName = file.FileName;
             if (await _documentStorage.FileExistsAsync(fileName))
@@ -75,21 +73,21 @@ namespace PaperlessREST.Controllers
                 // Upload document to MinIO
                 await _documentStorage.UploadFileAsync(file.FileName, tempPath);
 
-                // Add document to queue
-                string queueName = "ocr_queue";
-                await _queueService.PublishAsync(queueName, fileName);
-                _logger.LogInformation($"Message sent to queue {queueName}");
-
                 // Save metadata to database
                 Document docModel = new Document()
                 {
                     FileName = fileName,
-                    ByteSize = (int) file.Length // TODO: auf long setzen
+                    ByteSize = (int)file.Length // TODO: auf long setzen
                 };
 
                 _context.Documents.Add(docModel);
                 await _context.SaveChangesAsync();
-                
+
+                // Add document to queue
+                int id = docModel.Id;
+                await _queueService.PublishAsync(id, fileName);
+                _logger.LogInformation($"Message successfully sent to queue");
+
                 return docModel;  // 201 Created
             }
             catch (Exception ex)

@@ -24,14 +24,62 @@ namespace GenAIWorker.Services
             if (String.IsNullOrEmpty(text))
             {
                 _logger.LogError("Failed to summarize empty text");
-                throw new Exception("Failed to summarize empty text");
+                throw new EmptyTextException();
             }
 
             try
             {
+                // Request
                 string prompt = $"Summarize the following document:\n{text}";
+                var response = await RequestSummary(prompt);
 
-                var client = new RestClient("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
+                // Get summary
+                using var doc = JsonDocument.Parse(response.Content!);
+                string summary = doc.RootElement
+                    .GetProperty("candidates")[0]
+                    .GetProperty("content")
+                    .GetProperty("parts")[0]
+                    .GetProperty("text")
+                    .GetString()!;
+
+                if (String.IsNullOrEmpty(summary))
+                {
+                    throw new EmptySummaryException();
+                }
+
+                // Check quality
+                int MIN_LENGTH = 15;
+                if (summary.Length <  MIN_LENGTH)
+                {
+                    throw new SummaryQualityException();
+                }
+
+                _logger.LogInformation($"Finished summarizing text");
+                return summary;
+            }
+            catch (EmptySummaryException ex)
+            {
+                _logger.LogError(ex, $"GenAI returned empty summary");
+                throw new SummaryGeneratorException(ex);
+            }
+            catch (SummaryQualityException ex)
+            {
+                _logger.LogError(ex, $"Generative summary was not a real summary");
+                throw new SummaryGeneratorException(ex);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Failed to summarize text");
+                throw new SummaryGeneratorException(ex);
+            }
+        }
+
+        public async Task<RestResponse> RequestSummary(string prompt)
+        {
+            try
+            {
+                string endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+                using var client = new RestClient(endpoint);
                 var request = new RestRequest();
                 request.AddQueryParameter("key", _apiKey);
                 request.AddJsonBody(new
@@ -49,24 +97,16 @@ namespace GenAIWorker.Services
                 var response = await client.PostAsync(request);
                 if (!response.IsSuccessful)
                 {
-                    throw new Exception($"Gemini API error: {response.Content}");
+                    _logger.LogError("Gemini API response failed");
+                    throw new GeminiApiException();
                 }
 
-                using var doc = JsonDocument.Parse(response.Content!);
-                string summary = doc.RootElement
-                    .GetProperty("candidates")[0]
-                    .GetProperty("content")
-                    .GetProperty("parts")[0]
-                    .GetProperty("text")
-                    .GetString()!;
-
-                _logger.LogInformation($"Finished summarizing text:\n{summary}");
-                return summary;
+                return response;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Gemini request failed");
-                throw new Exception("Gemini request failed");
+                throw new GeminiRequestException();
             }
         }
     }
