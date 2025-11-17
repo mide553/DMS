@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using PaperlessREST;
+using PaperlessREST.Controllers;
 using PaperlessREST.Data;
 using PaperlessREST.Services;
 
@@ -16,6 +18,9 @@ builder.Services.AddDbContext<ApplicationDBContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
+// DocumentService
+builder.Services.AddScoped<IDocumentService, DocumentService>();
+
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
 
@@ -24,6 +29,9 @@ builder.Services.AddSingleton<IDocumentStorageService, MinIOService>();
 
 // RabbitMQ
 builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
+
+// Worker
+builder.Services.AddHostedService<Worker>();
 
 var app = builder.Build();
 

@@ -8,6 +8,7 @@ namespace PaperlessREST.Services
     {
         public Task UploadFileAsync(string documentName, string filePath);
         public Task DeleteFileAsync(string documentName);
+        public Task<bool> FileExistsAsync(string documentName);
     }
     
     public class MinIOService : IDocumentStorageService
@@ -64,6 +65,21 @@ namespace PaperlessREST.Services
             {
                 _logger.LogError(ex, $"Failed to delete {documentName} from MinIO.");
                 throw;
+            }
+        }
+
+        public async Task<bool> FileExistsAsync(string documentName)
+        {
+            try
+            {
+                await _client.StatObjectAsync(new StatObjectArgs()
+                    .WithBucket(_bucketName)
+                    .WithObject(documentName));
+                return true;
+            }
+            catch (Minio.Exceptions.ObjectNotFoundException)
+            {
+                return false;
             }
         }
     }

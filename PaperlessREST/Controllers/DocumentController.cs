@@ -1,38 +1,36 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using PaperlessREST.Services.Interface;
-using AutoMapper;
-using PaperlessREST.Data;
 using PaperlessREST.Exceptions;
 using PaperlessModels.Models;
 using PaperlessModels.DTOs;
 
-namespace PaperlessREST.Services
+namespace PaperlessREST.Controllers
 {
+    public interface IDocumentController
+    {
+        public Task<IActionResult> GetAllDocuments();
+        public Task<IActionResult> GetDocumentById(int id);
+        public Task<IActionResult> UploadDocument(IFormFile file);
+        public Task<IActionResult> DeleteDocument(int id);
+        public Task<IActionResult> UpdateDocument(int id, DocumentDto docDto);
+    }
+
     [ApiController]
     [Route("api/documents")]
     public class DocumentController : ControllerBase, IDocumentController
     {
-        private readonly ApplicationDBContext _context;
-        private readonly IMapper _mapper;
-        private readonly IDocumentStorageService _documentStorage;
-        private readonly IMessageQueueService _queueService;
+        private readonly IDocumentService _documentService;
         private readonly ILogger<DocumentController> _logger;
 
-
-        public DocumentController(ApplicationDBContext dbContext, IMapper mapper, IDocumentStorageService documentStorage, IMessageQueueService queueService, ILogger<DocumentController> logger)
+        public DocumentController(IDocumentService documentService, ILogger<DocumentController> logger)
         {
-            _context = dbContext;
-            _mapper = mapper;
-            _documentStorage = documentStorage;
-            _queueService = queueService;
+            _documentService = documentService;
             _logger = logger;
         }
 
         [HttpGet]
-        public IActionResult GetAllDocuments()
+        public async Task<IActionResult> GetAllDocuments()
         {
-            _logger.LogInformation("Fetching all documents");
-            List<Document> docs = _context.Documents.ToList();
+            List<Document> docs = await _documentService.GetAllDocumentsAsync();
 
             if (docs is null)
             {
@@ -44,22 +42,20 @@ namespace PaperlessREST.Services
         }
 
         [HttpGet("{id}")]
-        public IActionResult GetDocumentById([FromRoute] int id)
+        public async Task<IActionResult> GetDocumentById([FromRoute] int id)
         {
-            _logger.LogInformation($"Fetching document with ID {id}");
-
             if (id < 1)
             {
-                _logger.LogError($"Invalid ID: {id}");
-                throw new InvalidIdException(id);
+                _logger.LogWarning($"Invalid document ID: {id}");
+                return BadRequest($"Invalid document ID: {id}"); // 400 Bad Request
             }
 
-            var doc = _context.Documents.Find(id);
-
+            DocumentDto doc = await _documentService.GetDocumentByIdAsync(id);
+                
             if (doc is null)
             {
                 _logger.LogWarning($"Document with ID {id} not found");
-                return NotFound(); // 404 Not Found
+                return NotFound();  // 404 Not Found
             }
 
             return Ok(doc); // 200 Ok
@@ -68,130 +64,97 @@ namespace PaperlessREST.Services
         [HttpPost("upload")]
         public async Task<IActionResult> UploadDocument(IFormFile file)
         {
-            _logger.LogInformation($"Uploading new document");
-
             if (file == null || file.Length == 0)
-                return BadRequest("No file uploaded");
-
-            long fileSize = file.Length;
-            if (fileSize > (5 * 1024 * 1024))
-                return BadRequest("Maximum size can be 5MB");
-
-            string fileName = file.FileName;
-
-            // Save uploaded file temporaryly inside container
-            var tempPath = Path.Combine(Path.GetTempPath(), file.FileName);
-            using (var stream = System.IO.File.Create(tempPath))
             {
-                await file.CopyToAsync(stream);
+                _logger.LogWarning("No file uploaded");
+                return BadRequest("No file uploaded");  // 400 Bad Request
             }
 
-            // Save metadata to database
-            Document docModel = new Document()
+            const long maxFileSize = 5 * 1024 * 1024;   // 5 MB
+            if (file.Length > maxFileSize)
             {
-                FileName = fileName,
-                ByteSize = (int)fileSize
-            };
+                _logger.LogWarning($"Uploaded file exceeds size limit: {file.Length} bytes");
+                return BadRequest("Maximum file size is 5MB");  // 400 Bad Request
+            }
 
             try
             {
-                // Upload document to MinIO
-                await _documentStorage.UploadFileAsync(file.FileName, tempPath);
+                Document doc = await _documentService.UploadDocumentAsync(file);
 
-                // Add document to queue
-                string queueName = "ocr_queue";
-                await _queueService.PublishAsync(queueName, fileName);
-                _logger.LogInformation($"Message sent to queue {queueName}");
-
-                _context.Documents.Add(docModel); // TODO: Check if filename already exists
-                _context.SaveChanges();
+                return CreatedAtAction(nameof(GetDocumentById), new { id = doc.Id }, doc);  // 201 Created
+            }
+            catch (FileAlreadyExistsException)
+            {
+                return Conflict($"File with name {file.FileName} already exists");  // 409 Conflict
+            }
+            catch (DocumentUploadException ex)
+            {
+                _logger.LogError(ex, "Failed to upload document");
+                return StatusCode(500, "An error occurred while uploading the document");   // 500 Internal Server Error
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to save the changes");
-                throw new FailedSaveException(ex);
+                _logger.LogError(ex, "Unexpected error while uploading document");
+                return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
             }
-            finally
-            {
-                // Delete temp file after upload
-                System.IO.File.Delete(tempPath);
-            }
-
-            // Return created Document as DTO Object
-            return CreatedAtAction(nameof(GetDocumentById), new { id = docModel.Id }, _mapper.Map<DocumentDto>(docModel));  // 201 Created
         }
 
         [HttpDelete("{id}")]
-        public IActionResult DeleteDocument([FromRoute] int id)
+        public async Task<IActionResult> DeleteDocument([FromRoute] int id)
         {
-            _logger.LogInformation($"Deleting document with ID {id}");
-
             if (id < 1)
             {
-                _logger.LogError($"Invalid ID: {id}");
-                throw new InvalidIdException(id);
-            }
-
-            var docModel = _context.Documents.FirstOrDefault(x => x.Id == id);
-
-            if (docModel is null)
-            {
-                _logger.LogWarning($"Document with ID {id} not found");
-                return NotFound();    // 404 Not Found
+                _logger.LogWarning($"Invalid document ID: {id}");
+                return BadRequest($"Invalid document ID: {id}");    // 400 Bad Request
             }
 
             try
             {
-                _context.Documents.Remove(docModel);
-                _context.SaveChanges();
-
-                _documentStorage.DeleteFileAsync(docModel.FileName);
+                await _documentService.DeleteDocumentAsync(id);
+                return NoContent(); // 204 No Content
+            }
+            catch (DocumentNotFoundException)
+            {
+                return NotFound();  // 404 Not Found
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to save the changes");
-                throw new FailedSaveException(ex);
+                _logger.LogError(ex, $"Unexpected error deleting document {id}");
+                return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
             }
-
-            return NoContent(); // 204 No Content
         }
 
         [HttpPut("{id}")]
-        public IActionResult UpdateDocument([FromRoute] int id, [FromBody] DocumentDto docDto)
+        public async Task<IActionResult> UpdateDocument([FromRoute] int id, [FromBody] DocumentDto docDto)
         {
-            _logger.LogInformation($"Updating document with ID {id}");
-
             if (id < 1)
             {
-                _logger.LogError($"Invalid ID: {id}");
-                throw new InvalidIdException(id);
+                _logger.LogWarning($"Invalid document ID: {id}");
+                return BadRequest($"Invalid document ID: {id}");    // 400 Bad Request
             }
 
-            var docModel = _context.Documents.FirstOrDefault(x => x.Id == id);
-
-            if (docModel is null)
+            if (docDto is null)
             {
-                _logger.LogWarning($"Document with ID {id} not found");
-                return NotFound();    // 404 Not Found
+                _logger.LogWarning($"DocumentDto is null for ID: {id}");
+                return BadRequest("Document data must be provided");    // 400 Bad Request
             }
-
-            docModel.FileName = docDto.FileName;
-            docModel.ByteSize = docDto.ByteSize;
-            docModel.Summary = docDto.Summary;
-            docModel.LastModified = docDto.LastModified;
 
             try
             {
-                _context.SaveChanges();
+                DocumentDto doc = await _documentService.UpdateDocumentAsync(id, docDto);
+                
+                // Return updated Document as DTO Object
+                return Ok(doc); // 200 Ok
             }
-            catch (Exception ex)
+            catch (DocumentNotFoundException)
             {
-                _logger.LogError(ex, "Failed to save the changes");
-                throw new FailedSaveException(ex);
+                return NotFound();  // 404 Not Found
             }
-
-            // Return updated Document as DTO Object
-            return Ok(_mapper.Map<DocumentDto>(docModel));  // 200 Ok
+            catch (DocumentUpdateException ex)
+            {
+                _logger.LogError(ex, $"Failed to update document {id}");
+                return StatusCode(500, "Failed to update document due to an internal error");   // 500 Internal Server Error
+            }
         }
     }
 }
