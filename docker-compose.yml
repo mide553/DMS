@@ -100,6 +100,9 @@ services:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_USER: ${RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: "PaperlessAPI"
+      Jwt__Audience: "PaperlessClient"
     labels:
       - com.docker.compose.rebuild=true
     depends_on:
