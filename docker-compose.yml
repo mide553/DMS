@@ -116,6 +116,8 @@ services:
     build:
       context: ./PaperlessWebUI
       dockerfile: Dockerfile
+      args:
+        CACHEBUST: ${CACHEBUST:-1}
     container_name: PaperlessWebUI
     labels:
       - com.docker.compose.rebuild=true
