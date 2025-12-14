@@ -1,4 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using PaperlessREST.Exceptions;
 using PaperlessREST.Services;
 using PaperlessModels.Models;
@@ -17,6 +19,7 @@ namespace PaperlessREST.Controllers
 
     [ApiController]
     [Route("api/documents")]
+    [Authorize]
     public class DocumentController : ControllerBase, IDocumentController
     {
         private readonly IDocumentService _documentService;
@@ -28,15 +31,26 @@ namespace PaperlessREST.Controllers
             _logger = logger;
         }
 
+        private int GetUserId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out int userId))
+            {
+                throw new UnauthorizedAccessException("User ID not found in token");
+            }
+            return userId;
+        }
+
         [HttpGet]
         public async Task<IActionResult> GetAllDocuments()
         {
-            List<Document> docs = await _documentService.GetAllDocumentsAsync();
+            int userId = GetUserId();
+            List<Document> docs = await _documentService.GetAllDocumentsAsync(userId);
 
-            if (docs is null)
+            if (docs is null || docs.Count == 0)
             {
-                _logger.LogWarning($"No document found");
-                return NotFound();    // 404 Not Found
+                _logger.LogWarning($"No document found for user {userId}");
+                return Ok(new List<Document>());    // 200 Ok with empty list
             }
 
             return Ok(docs);    // 200 Ok
@@ -51,11 +65,12 @@ namespace PaperlessREST.Controllers
                 return BadRequest($"Invalid document ID: {id}"); // 400 Bad Request
             }
 
-            DocumentDto doc = await _documentService.GetDocumentByIdAsync(id);
-                
+            int userId = GetUserId();
+            DocumentDto doc = await _documentService.GetDocumentByIdAsync(id, userId);
+
             if (doc is null)
             {
-                _logger.LogWarning($"Document with ID {id} not found");
+                _logger.LogWarning($"Document with ID {id} not found or unauthorized");
                 return NotFound();  // 404 Not Found
             }
 
@@ -80,7 +95,8 @@ namespace PaperlessREST.Controllers
 
             try
             {
-                Document doc = await _documentService.UploadDocumentAsync(file);
+                int userId = GetUserId();
+                Document doc = await _documentService.UploadDocumentAsync(file, userId);
 
                 return CreatedAtAction(nameof(GetDocumentById), new { id = doc.Id }, doc);  // 201 Created
             }
@@ -111,12 +127,17 @@ namespace PaperlessREST.Controllers
 
             try
             {
-                await _documentService.DeleteDocumentAsync(id);
+                int userId = GetUserId();
+                await _documentService.DeleteDocumentAsync(id, userId);
                 return NoContent(); // 204 No Content
             }
             catch (DocumentNotFoundException)
             {
                 return NotFound();  // 404 Not Found
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();    // 403 Forbidden
             }
             catch (Exception ex)
             {
@@ -142,14 +163,19 @@ namespace PaperlessREST.Controllers
 
             try
             {
-                DocumentDto doc = await _documentService.UpdateDocumentAsync(id, docDto);
-                
+                int userId = GetUserId();
+                DocumentDto doc = await _documentService.UpdateDocumentAsync(id, docDto, userId);
+
                 // Return updated Document as DTO Object
                 return Ok(doc); // 200 Ok
             }
             catch (DocumentNotFoundException)
             {
                 return NotFound();  // 404 Not Found
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();    // 403 Forbidden
             }
             catch (DocumentUpdateException ex)
             {

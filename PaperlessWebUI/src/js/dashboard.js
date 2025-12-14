@@ -7,6 +7,22 @@ class Dashboard {
     }
 
     init() {
+        // Check authentication
+        auth.checkAuth();
+
+        // Display user info
+        const username = auth.getUsername();
+        const userInfoElement = document.getElementById('userInfo');
+        if (userInfoElement && username) {
+            userInfoElement.textContent = `Welcome, ${username}`;
+        }
+
+        // Bind logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => auth.logout());
+        }
+
         this.bindEvents();
         this.loadDocuments();
     }
@@ -296,10 +312,22 @@ class Dashboard {
                 uploadBtn.textContent = 'Uploading...';
             }
 
+            const token = auth.getToken();
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch('/api/documents/upload', {
                 method: 'POST',
+                headers: headers,
                 body: formData
             });
+
+            if (response.status === 401) {
+                auth.logout();
+                return;
+            }
 
             if (!response.ok) {
                 const errorText = await response.text();

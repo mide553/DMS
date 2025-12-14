@@ -1,6 +1,34 @@
 // API Configuration
 const API_BASE_URL = '/api';
 
+// Authentication utilities
+const auth = {
+    getToken() {
+        return localStorage.getItem('token');
+    },
+
+    getUsername() {
+        return localStorage.getItem('username');
+    },
+
+    isLoggedIn() {
+        return !!this.getToken();
+    },
+
+    logout() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        localStorage.removeItem('email');
+        window.location.href = 'login.html';
+    },
+
+    checkAuth() {
+        if (!this.isLoggedIn()) {
+            window.location.href = 'login.html';
+        }
+    }
+};
+
 // API Client class for handling all HTTP requests
 class ApiClient {
     constructor(baseUrl = API_BASE_URL) {
@@ -16,6 +44,12 @@ class ApiClient {
             },
         };
 
+        // Add authentication token if available
+        const token = auth.getToken();
+        if (token) {
+            defaultOptions.headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const finalOptions = {
             ...defaultOptions,
             ...options,
@@ -26,6 +60,12 @@ class ApiClient {
         };
 
         const response = await fetch(url, finalOptions);
+
+        // Handle unauthorized responses
+        if (response.status === 401) {
+            auth.logout();
+            return;
+        }
 
         if (!response.ok) {
             console.error('API request failed with status:', response.status);

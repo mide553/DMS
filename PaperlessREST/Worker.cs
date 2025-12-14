@@ -5,6 +5,7 @@ using System.Text.Json;
 using PaperlessModels.DTOs;
 using PaperlessREST.Services;
 using PaperlessREST.Exceptions;
+using PaperlessREST.Data;
 
 namespace PaperlessREST
 {
@@ -75,7 +76,7 @@ namespace PaperlessREST
                     {
                         // Save summary
                         await ProcessDocumentAsync(id, summary);
-                
+
                         await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                     }
                     catch (Exception ex)
@@ -118,20 +119,30 @@ namespace PaperlessREST
                 using (var scope = _serviceProvider.CreateScope())
                 {
                     var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+                    var context = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
+
+                    // Get document from database directly to get userId
+                    var document = await context.Documents.FindAsync(id);
+
+                    if (document == null)
+                    {
+                        _logger.LogWarning($"Document with ID {id} not found");
+                        return;
+                    }
 
                     // Get document to update
-                    DocumentDto currDoc = await documentService.GetDocumentByIdAsync(id);
-                    
+                    DocumentDto currDoc = await documentService.GetDocumentByIdAsync(id, document.UserId);
+
                     // Add summary to document
-                    DocumentDto doc = new DocumentDto 
-                    { 
+                    DocumentDto doc = new DocumentDto
+                    {
                         FileName = currDoc.FileName,
                         ByteSize = currDoc.ByteSize,
                         LastModified = currDoc.LastModified,
-                        Summary = summary 
+                        Summary = summary
                     };
 
-                    await documentService.UpdateDocumentAsync(id, doc);
+                    await documentService.UpdateDocumentAsync(id, doc, document.UserId);
 
                     _logger.LogInformation($"Saved summary to document {id}");
                 }

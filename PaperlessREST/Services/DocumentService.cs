@@ -9,11 +9,11 @@ namespace PaperlessREST.Services
 {
     public interface IDocumentService
     {
-        public Task<List<Document>> GetAllDocumentsAsync();
-        public Task<DocumentDto> GetDocumentByIdAsync(int id);
-        public Task<Document> UploadDocumentAsync(IFormFile file);
-        public Task DeleteDocumentAsync(int id);
-        public Task<DocumentDto> UpdateDocumentAsync(int id, DocumentDto docDto);
+        public Task<List<Document>> GetAllDocumentsAsync(int userId);
+        public Task<DocumentDto> GetDocumentByIdAsync(int id, int userId);
+        public Task<Document> UploadDocumentAsync(IFormFile file, int userId);
+        public Task DeleteDocumentAsync(int id, int userId);
+        public Task<DocumentDto> UpdateDocumentAsync(int id, DocumentDto docDto, int userId);
     }
 
     public class DocumentService : IDocumentService
@@ -33,31 +33,34 @@ namespace PaperlessREST.Services
             _logger = logger;
         }
 
-        public async Task<List<Document>> GetAllDocumentsAsync()
+        public async Task<List<Document>> GetAllDocumentsAsync(int userId)
         {
-            _logger.LogInformation("Fetching all documents");
-            List<Document> docs = await _context.Documents.ToListAsync();
+            _logger.LogInformation($"Fetching all documents for user {userId}");
+            List<Document> docs = await _context.Documents
+                .Where(d => d.UserId == userId)
+                .ToListAsync();
 
             return docs;
         }
 
-        public async Task<DocumentDto> GetDocumentByIdAsync(int id)
+        public async Task<DocumentDto> GetDocumentByIdAsync(int id, int userId)
         {
-            _logger.LogInformation($"Fetching document with ID {id}");
-            var doc = await _context.Documents.FindAsync(id);
+            _logger.LogInformation($"Fetching document with ID {id} for user {userId}");
+            var doc = await _context.Documents
+                .FirstOrDefaultAsync(d => d.Id == id && d.UserId == userId);
 
             return _mapper.Map<DocumentDto>(doc);
         }
 
-        public async Task<Document> UploadDocumentAsync(IFormFile file)
+        public async Task<Document> UploadDocumentAsync(IFormFile file, int userId)
         {
-            _logger.LogInformation($"Uploading new document");
+            _logger.LogInformation($"Uploading new document for user {userId}");
 
-            // Check if filename already exists
+            // Check if filename already exists for this user
             string fileName = file.FileName;
-            if (await _documentStorage.FileExistsAsync(fileName))
+            if (await _context.Documents.AnyAsync(d => d.FileName == fileName && d.UserId == userId))
             {
-                _logger.LogWarning($"File {fileName} already exists");
+                _logger.LogWarning($"File {fileName} already exists for user {userId}");
                 throw new FileAlreadyExistsException(fileName);
             }
 
@@ -77,7 +80,8 @@ namespace PaperlessREST.Services
                 Document docModel = new Document()
                 {
                     FileName = fileName,
-                    ByteSize = (int)file.Length // TODO: auf long setzen
+                    ByteSize = (int)file.Length, // TODO: auf long setzen
+                    UserId = userId
                 };
 
                 _context.Documents.Add(docModel);
@@ -102,9 +106,9 @@ namespace PaperlessREST.Services
             }
         }
 
-        public async Task DeleteDocumentAsync(int id)
+        public async Task DeleteDocumentAsync(int id, int userId)
         {
-            _logger.LogInformation($"Deleting document with ID {id}");
+            _logger.LogInformation($"Deleting document with ID {id} for user {userId}");
 
             var docModel = await _context.Documents.FirstOrDefaultAsync(x => x.Id == id);
 
@@ -112,6 +116,12 @@ namespace PaperlessREST.Services
             {
                 _logger.LogWarning($"Document with ID {id} not found");
                 throw new DocumentNotFoundException(id);
+            }
+
+            if (docModel.UserId != userId)
+            {
+                _logger.LogWarning($"User {userId} attempted to delete document {id} owned by user {docModel.UserId}");
+                throw new UnauthorizedAccessException($"User is not authorized to delete this document");
             }
 
             try
@@ -130,9 +140,9 @@ namespace PaperlessREST.Services
             }
         }
 
-        public async Task<DocumentDto> UpdateDocumentAsync(int id, DocumentDto docDto)
+        public async Task<DocumentDto> UpdateDocumentAsync(int id, DocumentDto docDto, int userId)
         {
-            _logger.LogInformation($"Updating document with ID {id}");
+            _logger.LogInformation($"Updating document with ID {id} for user {userId}");
 
             var docModel = await _context.Documents.FirstOrDefaultAsync(x => x.Id == id);
 
@@ -140,6 +150,12 @@ namespace PaperlessREST.Services
             {
                 _logger.LogWarning($"Document with ID {id} not found");
                 throw new DocumentNotFoundException(id);
+            }
+
+            if (docModel.UserId != userId)
+            {
+                _logger.LogWarning($"User {userId} attempted to update document {id} owned by user {docModel.UserId}");
+                throw new UnauthorizedAccessException($"User is not authorized to update this document");
             }
 
             docModel.FileName = docDto.FileName;
