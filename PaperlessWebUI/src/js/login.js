@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = '/api';
 
 // Toggle between login and register forms
 document.getElementById('showRegister').addEventListener('click', () => {
