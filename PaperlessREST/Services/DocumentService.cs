@@ -9,7 +9,7 @@ namespace PaperlessREST.Services
 {
     public interface IDocumentService
     {
-        public Task<List<Document>> GetAllDocumentsAsync(int userId);
+        public Task<List<DocumentDto>> GetAllDocumentsAsync(int userId);
         public Task<DocumentDto> GetDocumentByIdAsync(int id, int userId);
         public Task<Document> UploadDocumentAsync(IFormFile file, int userId);
         public Task DeleteDocumentAsync(int id, int userId);
@@ -33,14 +33,14 @@ namespace PaperlessREST.Services
             _logger = logger;
         }
 
-        public async Task<List<Document>> GetAllDocumentsAsync(int userId)
+        public async Task<List<DocumentDto>> GetAllDocumentsAsync(int userId)
         {
             _logger.LogInformation($"Fetching all documents for user {userId}");
             List<Document> docs = await _context.Documents
                 .Where(d => d.UserId == userId)
                 .ToListAsync();
 
-            return docs;
+            return _mapper.Map<List<DocumentDto>>(docs);
         }
 
         public async Task<DocumentDto> GetDocumentByIdAsync(int id, int userId)
@@ -80,8 +80,8 @@ namespace PaperlessREST.Services
                 Document docModel = new Document()
                 {
                     FileName = fileName,
-                    ByteSize = (int)file.Length, // TODO: auf long setzen
-                    UserId = userId
+                    ByteSize = (long)file.Length,
+                    UserId = (int)userId
                 };
 
                 _context.Documents.Add(docModel);

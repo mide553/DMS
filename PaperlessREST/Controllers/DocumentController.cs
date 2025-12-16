@@ -45,7 +45,7 @@ namespace PaperlessREST.Controllers
         public async Task<IActionResult> GetAllDocuments()
         {
             int userId = GetUserId();
-            List<Document> docs = await _documentService.GetAllDocumentsAsync(userId);
+            List<DocumentDto> docs = await _documentService.GetAllDocumentsAsync(userId);
 
             if (docs is null || docs.Count == 0)
             {

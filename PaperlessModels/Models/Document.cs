@@ -11,7 +11,7 @@ namespace PaperlessModels.Models
         [Required]
         public string FileName { get; set; }
 
-        public int ByteSize { get; set; }
+        public long ByteSize { get; set; }
 
         public string Summary { get; set; } = string.Empty;
 

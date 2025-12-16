@@ -139,6 +139,7 @@ namespace PaperlessREST
                         FileName = currDoc.FileName,
                         ByteSize = currDoc.ByteSize,
                         LastModified = currDoc.LastModified,
+                        UserId = currDoc.UserId,
                         Summary = summary
                     };
 

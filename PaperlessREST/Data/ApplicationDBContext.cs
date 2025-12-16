@@ -30,6 +30,13 @@ namespace PaperlessREST.Data
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
+
+            // Documents deleted when user is deleted
+            modelBuilder.Entity<User>()
+                .HasMany(u => u.Documents)
+                .WithOne(d => d.User)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

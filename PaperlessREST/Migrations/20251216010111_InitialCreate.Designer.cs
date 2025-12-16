@@ -12,8 +12,8 @@ using PaperlessREST.Data;
 namespace PaperlessREST.Migrations
 {
     [DbContext(typeof(ApplicationDBContext))]
-    [Migration("20251214132835_AddUserAuthentication")]
-    partial class AddUserAuthentication
+    [Migration("20251216010111_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -33,8 +33,8 @@ namespace PaperlessREST.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("ByteSize")
-                        .HasColumnType("integer");
+                    b.Property<long>("ByteSize")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("FileName")
                         .IsRequired()

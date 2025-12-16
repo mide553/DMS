@@ -30,8 +30,8 @@ namespace PaperlessREST.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("ByteSize")
-                        .HasColumnType("integer");
+                    b.Property<long>("ByteSize")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("FileName")
                         .IsRequired()
