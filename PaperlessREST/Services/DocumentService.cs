@@ -9,7 +9,7 @@ namespace PaperlessREST.Services
 {
     public interface IDocumentService
     {
-        public Task<List<DocumentDto>> GetAllDocumentsAsync(int userId);
+        public Task<List<OwnDocumentDto>> GetAllDocumentsAsync(int userId);
         public Task<DocumentDto> GetDocumentByIdAsync(int id, int userId);
         public Task<Document> UploadDocumentAsync(IFormFile file, int userId);
         public Task DeleteDocumentAsync(int id, int userId);
@@ -33,21 +33,39 @@ namespace PaperlessREST.Services
             _logger = logger;
         }
 
-        public async Task<List<DocumentDto>> GetAllDocumentsAsync(int userId)
+        public async Task<List<OwnDocumentDto>> GetAllDocumentsAsync(int userId)
         {
             _logger.LogInformation($"Fetching all documents for user {userId}");
             List<Document> docs = await _context.Documents
                 .Where(d => d.UserId == userId)
                 .ToListAsync();
 
-            return _mapper.Map<List<DocumentDto>>(docs);
+            if (docs is null || docs.Count == 0)
+            {
+                _logger.LogWarning($"No document found for user {userId}");
+                return new List<OwnDocumentDto>();  // return empty list
+            }
+
+            return _mapper.Map<List<OwnDocumentDto>>(docs);
         }
 
         public async Task<DocumentDto> GetDocumentByIdAsync(int id, int userId)
         {
             _logger.LogInformation($"Fetching document with ID {id} for user {userId}");
             var doc = await _context.Documents
-                .FirstOrDefaultAsync(d => d.Id == id && d.UserId == userId);
+                .FirstOrDefaultAsync(d => d.Id == id);
+
+            if (doc is null)
+            {
+                _logger.LogWarning($"Document with ID {id} not found");
+                throw new NotFoundException("Document", id);
+            }
+
+            if (doc.UserId != userId)
+            {
+                _logger.LogWarning($"User {userId} attempted to see document {id} owned by user {doc.UserId}");
+                throw new ForbiddenContentException("Document", id, userId);
+            }
 
             return _mapper.Map<DocumentDto>(doc);
         }
@@ -88,8 +106,7 @@ namespace PaperlessREST.Services
                 await _context.SaveChangesAsync();
 
                 // Add document to queue
-                int id = docModel.Id;
-                await _queueService.PublishAsync(id, fileName);
+                await _queueService.PublishAsync(docModel.Id, fileName);
                 _logger.LogInformation($"Message successfully sent to queue");
 
                 return docModel;  // 201 Created
@@ -115,13 +132,13 @@ namespace PaperlessREST.Services
             if (docModel is null)
             {
                 _logger.LogWarning($"Document with ID {id} not found");
-                throw new DocumentNotFoundException(id);
+                throw new NotFoundException("Document", id);
             }
 
             if (docModel.UserId != userId)
             {
                 _logger.LogWarning($"User {userId} attempted to delete document {id} owned by user {docModel.UserId}");
-                throw new UnauthorizedAccessException($"User is not authorized to delete this document");
+                throw new ForbiddenActionException("Document", id, userId);
             }
 
             try
@@ -136,7 +153,7 @@ namespace PaperlessREST.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to delete document {id}");
-                throw new DocumentDeletionException(id, ex);
+                throw new DeletionException("Document", id, ex);
             }
         }
 
@@ -149,13 +166,13 @@ namespace PaperlessREST.Services
             if (docModel is null)
             {
                 _logger.LogWarning($"Document with ID {id} not found");
-                throw new DocumentNotFoundException(id);
+                throw new NotFoundException("Document", id);
             }
 
             if (docModel.UserId != userId)
             {
                 _logger.LogWarning($"User {userId} attempted to update document {id} owned by user {docModel.UserId}");
-                throw new UnauthorizedAccessException($"User is not authorized to update this document");
+                throw new ForbiddenActionException("Document", id, userId);
             }
 
             docModel.FileName = docDto.FileName;
@@ -171,7 +188,7 @@ namespace PaperlessREST.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to update document {DocumentId}", id);
-                throw new DocumentUpdateException(id, ex);
+                throw new UpdateException("Document", id, ex);
             }
 
             // Return updated Document as DTO Object

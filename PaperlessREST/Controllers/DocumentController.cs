@@ -45,13 +45,7 @@ namespace PaperlessREST.Controllers
         public async Task<IActionResult> GetAllDocuments()
         {
             int userId = GetUserId();
-            List<DocumentDto> docs = await _documentService.GetAllDocumentsAsync(userId);
-
-            if (docs is null || docs.Count == 0)
-            {
-                _logger.LogWarning($"No document found for user {userId}");
-                return Ok(new List<Document>());    // 200 Ok with empty list
-            }
+            List<OwnDocumentDto> docs = await _documentService.GetAllDocumentsAsync(userId);
 
             return Ok(docs);    // 200 Ok
         }
@@ -65,16 +59,30 @@ namespace PaperlessREST.Controllers
                 return BadRequest($"Invalid document ID: {id}"); // 400 Bad Request
             }
 
-            int userId = GetUserId();
-            DocumentDto doc = await _documentService.GetDocumentByIdAsync(id, userId);
-
-            if (doc is null)
+            try
             {
-                _logger.LogWarning($"Document with ID {id} not found or unauthorized");
+                int userId = GetUserId();
+                DocumentDto doc = await _documentService.GetDocumentByIdAsync(id, userId);
+                
+                return Ok(doc); // 200 Ok
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized();  // 401 Unauthorized
+            }
+            catch (ForbiddenContentException)
+            {
+                return Forbid();    // 403 Forbidden
+            }
+            catch (NotFoundException)
+            {
                 return NotFound();  // 404 Not Found
             }
-
-            return Ok(doc); // 200 Ok
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Unexpected error deleting document {id}");
+                return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
+            }
         }
 
         [HttpPost("upload")]
@@ -100,13 +108,16 @@ namespace PaperlessREST.Controllers
 
                 return CreatedAtAction(nameof(GetDocumentById), new { id = doc.Id }, doc);  // 201 Created
             }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized();  // 401 Unauthorized
+            }
             catch (FileAlreadyExistsException)
             {
                 return Conflict($"File with name {file.FileName} already exists");  // 409 Conflict
             }
             catch (DocumentUploadException ex)
             {
-                _logger.LogError(ex, "Failed to upload document");
                 return StatusCode(500, "An error occurred while uploading the document");   // 500 Internal Server Error
             }
             catch (Exception ex)
@@ -129,15 +140,20 @@ namespace PaperlessREST.Controllers
             {
                 int userId = GetUserId();
                 await _documentService.DeleteDocumentAsync(id, userId);
+                
                 return NoContent(); // 204 No Content
-            }
-            catch (DocumentNotFoundException)
-            {
-                return NotFound();  // 404 Not Found
             }
             catch (UnauthorizedAccessException)
             {
-                return Forbid();    // 403 Forbidden
+                return Unauthorized();  // 401 Unauthorized
+            }
+            catch (ForbiddenActionException)
+            {
+                return Forbid();        // 403 Forbidden
+            }
+            catch (NotFoundException)
+            {
+                return NotFound();      // 404 Not Found
             }
             catch (Exception ex)
             {
@@ -169,15 +185,19 @@ namespace PaperlessREST.Controllers
                 // Return updated Document as DTO Object
                 return Ok(doc); // 200 Ok
             }
-            catch (DocumentNotFoundException)
-            {
-                return NotFound();  // 404 Not Found
-            }
             catch (UnauthorizedAccessException)
+            {
+                return Unauthorized();  // 401 Unauthorized
+            }
+            catch (ForbiddenActionException)
             {
                 return Forbid();    // 403 Forbidden
             }
-            catch (DocumentUpdateException ex)
+            catch (NotFoundException)
+            {
+                return NotFound();  // 404 Not Found
+            }
+            catch (UpdateException ex)
             {
                 _logger.LogError(ex, $"Failed to update document {id}");
                 return StatusCode(500, "Failed to update document due to an internal error");   // 500 Internal Server Error

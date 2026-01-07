@@ -8,4 +8,13 @@
         public DateTime LastModified { get; set; }
         public int UserId { get; set; }
     }
+    
+    public class OwnDocumentDto
+    {
+        public int Id { get; set; }
+        public string FileName { get; set; }
+        public int ByteSize { get; set; }
+        public string Summary { get; set; }
+        public DateTime LastModified { get; set; }
+    }
 }

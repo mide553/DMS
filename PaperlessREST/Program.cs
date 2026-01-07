@@ -88,6 +88,9 @@ builder.Services.AddCors(options =>
 // DocumentService
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 
+// UserService
+builder.Services.AddScoped<IUserService, UserService>();
+
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
 
