@@ -1,144 +1,80 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using PaperlessModels.DTOs;
-using PaperlessModels.Models;
-using PaperlessREST.Data;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
+using PaperlessREST.Exceptions;
+using PaperlessREST.Services;
 
 namespace PaperlessREST.Controllers
 {
+    public interface IAuthController
+    {
+        public Task<IActionResult> Register(RegisterDto registerDto);
+        public Task<IActionResult> Login(LoginDto loginDto);
+    }
+
     [ApiController]
     [Route("api/auth")]
-    public class AuthController : ControllerBase
+    public class AuthController : ControllerBase, IAuthController
     {
-        private readonly ApplicationDBContext _context;
-        private readonly IConfiguration _configuration;
+        private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
 
-        public AuthController(ApplicationDBContext context, IConfiguration configuration, ILogger<AuthController> logger)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger)
         {
-            _context = context;
-            _configuration = configuration;
+            _authService = authService;
             _logger = logger;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto registerDto)
         {
-            // Check if username already exists
-            if (await _context.Users.AnyAsync(u => u.Username == registerDto.Username))
+            try
             {
-                return BadRequest(new { message = "Username already exists" });
+                AuthResponseDto auth = await _authService.RegisterAsync(registerDto);
+            
+                return Ok(auth);    // 200 Ok
             }
-
-            // Check if email already exists
-            if (await _context.Users.AnyAsync(u => u.Email == registerDto.Email))
+            catch (UserAlreadyExistsException ex)
             {
-                return BadRequest(new { message = "Email already exists" });
+                string error = ex.Reason switch
+                {
+                    RegisterConflictReason.Username => "Username already exists",
+                    RegisterConflictReason.Email => "Email already exists",
+                    _ => "User already exists"
+                };
+
+                return Conflict(new
+                {
+                    error = error
+                });  // 409 Conflict
             }
-
-            // Hash the password
-            string passwordHash = HashPassword(registerDto.Password);
-
-            // Create new user
-            var user = new User
+            catch (Exception ex)
             {
-                Username = registerDto.Username,
-                Email = registerDto.Email,
-                PasswordHash = passwordHash,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation($"New user registered: {user.Username}");
-
-            // Generate token
-            var token = GenerateJwtToken(user);
-
-            return Ok(new AuthResponseDto
-            {
-                Token = token,
-                Username = user.Username,
-                Email = user.Email
-            });
+                _logger.LogError(ex, "Unexpected error while registering user");
+                return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
+            }
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
-            // Find user by username
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == loginDto.Username);
-
-            if (user == null)
+            try
             {
-                return Unauthorized(new { message = "Invalid username or password" });
+                AuthResponseDto auth = await _authService.LoginAsync(loginDto);
+
+                return Ok(auth);    // 200 Ok
             }
-
-            // Verify password
-            if (!VerifyPassword(loginDto.Password, user.PasswordHash))
+            catch (UnauthorizedAccessException)
             {
-                return Unauthorized(new { message = "Invalid username or password" });
+                return Unauthorized(new
+                {
+                    error = "Invalid username or password"
+                });  // 401 Unauthorized
             }
-
-            _logger.LogInformation($"User logged in: {user.Username}");
-
-            // Generate token
-            var token = GenerateJwtToken(user);
-
-            return Ok(new AuthResponseDto
+            catch (Exception ex)
             {
-                Token = token,
-                Username = user.Username,
-                Email = user.Email
-            });
-        }
-
-        private string GenerateJwtToken(User user)
-        {
-            var jwtKey = _configuration["Jwt:Key"] ?? "your-super-secret-key-minimum-32-characters-long-for-security";
-            var jwtIssuer = _configuration["Jwt:Issuer"] ?? "PaperlessAPI";
-            var jwtAudience = _configuration["Jwt:Audience"] ?? "PaperlessClient";
-
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-            };
-
-            var token = new JwtSecurityToken(
-                issuer: jwtIssuer,
-                audience: jwtAudience,
-                claims: claims,
-                expires: DateTime.UtcNow.AddDays(7),
-                signingCredentials: credentials
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-        }
-
-        private string HashPassword(string password)
-        {
-            using var sha256 = SHA256.Create();
-            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(password));
-            return Convert.ToBase64String(hashedBytes);
-        }
-
-        private bool VerifyPassword(string password, string passwordHash)
-        {
-            var hashedInput = HashPassword(password);
-            return hashedInput == passwordHash;
+                _logger.LogError(ex, "Unexpected error while user login");
+                return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
+            }
         }
     }
 }

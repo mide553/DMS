@@ -2,6 +2,6 @@
 {
     public class FileAlreadyExistsException : Exception
     {
-        public FileAlreadyExistsException(string fileName) : base($"File {fileName} already exists") { }
+        public FileAlreadyExistsException(string fileName) : base($"File with name {fileName} already exists") { }
     }
 }

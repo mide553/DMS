@@ -88,6 +88,9 @@ builder.Services.AddCors(options =>
 // DocumentService
 builder.Services.AddScoped<IDocumentService, DocumentService>();
 
+// AuthService
+builder.Services.AddScoped<IAuthService, AuthService>();
+
 // UserService
 builder.Services.AddScoped<IUserService, UserService>();
 
