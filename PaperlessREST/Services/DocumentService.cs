@@ -66,7 +66,7 @@ namespace PaperlessREST.Services
                 _logger.LogWarning($"User {userId} attempted to see document {id} owned by user {doc.UserId}");
                 throw new ForbiddenContentException("Document", id, userId);
             }
-
+            
             return _mapper.Map<DocumentDto>(doc);
         }
 
@@ -82,7 +82,8 @@ namespace PaperlessREST.Services
                 throw new FileAlreadyExistsException(fileName);
             }
 
-            var tempPath = Path.Combine(Path.GetTempPath(), file.FileName);
+            string storageFileName = _CreateStorageFilename(userId, fileName);
+            var tempPath = Path.Combine(Path.GetTempPath(), storageFileName);
             try
             {
                 // Save uploaded file temporaryly inside container
@@ -92,7 +93,7 @@ namespace PaperlessREST.Services
                 }
 
                 // Upload document to MinIO
-                await _documentStorage.UploadFileAsync(file.FileName, tempPath);
+                await _documentStorage.UploadFileAsync(storageFileName, tempPath);
 
                 // Save metadata to database
                 Document docModel = new Document()
@@ -106,7 +107,8 @@ namespace PaperlessREST.Services
                 await _context.SaveChangesAsync();
 
                 // Add document to queue
-                await _queueService.PublishAsync(docModel.Id, fileName);
+
+                await _queueService.PublishAsync(docModel.Id, storageFileName);
                 _logger.LogInformation($"Message successfully sent to queue");
 
                 return docModel;  // 201 Created
@@ -143,7 +145,8 @@ namespace PaperlessREST.Services
 
             try
             {
-                await _documentStorage.DeleteFileAsync(docModel.FileName);
+                string storageFileName = _CreateStorageFilename(userId, docModel.FileName);
+                await _documentStorage.DeleteFileAsync(storageFileName);
 
                 _context.Documents.Remove(docModel);
                 await _context.SaveChangesAsync();
@@ -193,6 +196,12 @@ namespace PaperlessREST.Services
 
             // Return updated Document as DTO Object
             return _mapper.Map<DocumentDto>(docModel);
+        }
+
+        private string _CreateStorageFilename(int id, string filename)
+        {
+            // Generate unique filename for filestorage
+            return $"UserID-{id}_{filename}";
         }
     }
 }
