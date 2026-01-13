@@ -1,5 +1,6 @@
 using OcrWorker.Exceptions;
 using OcrWorker.Services;
+using PaperlessModels.DTOs;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Text;
@@ -18,9 +19,10 @@ namespace OcrWorker
         private readonly IChannel _channel;
         private readonly IDocumentStorageService _documentStorage;
         private readonly IDocumentExtractorService _documentExtractor;
+        private readonly ISearchIndexService _searchIndexService;
         private readonly ILogger<Worker> _logger;
 
-        public Worker(IDocumentStorageService documentStorage, IDocumentExtractorService documentExtractor, IConfiguration config, ILogger<Worker> logger)
+        public Worker(IDocumentStorageService documentStorage, IDocumentExtractorService documentExtractor, IConfiguration config, ISearchIndexService searchIndexService, ILogger<Worker> logger)
         {
             var factory = new ConnectionFactory
             {
@@ -33,6 +35,7 @@ namespace OcrWorker
 
             _documentStorage = documentStorage;
             _documentExtractor = documentExtractor;
+            _searchIndexService = searchIndexService;
             _logger = logger;
         }
 
@@ -69,6 +72,12 @@ namespace OcrWorker
                         throw new InvalidMessageException("filename");
                     }
 
+                    if (!message.TryGetValue("userId", out var userIdString) ||
+                    !int.TryParse(userIdString, out int userId))
+                    {
+                        throw new InvalidMessageException("userId");
+                    }
+
                     _logger.LogInformation($"Received OCR job for {fileName}");
 
                     var localPath = Path.Combine("/tmp", fileName);
@@ -82,7 +91,16 @@ namespace OcrWorker
 
                         // Send text to summarizer
                         await PublishForSummarizer(id, text);
-                    
+
+                        // Index document
+                        IndexedDocument document = new IndexedDocument
+                        {
+                            DocumentId = id,
+                            UserId = userId,
+                            Content = text
+                        };
+                        await _searchIndexService.IndexAsync(document);
+
                         // Acknowledge message (deletes from queue)
                         await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                     }

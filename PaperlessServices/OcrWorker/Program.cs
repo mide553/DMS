@@ -12,5 +12,8 @@ builder.Services.AddScoped<IDocumentStorageService, MinIOService>();
 // Tesseract
 builder.Services.AddScoped<IDocumentExtractorService, TesseractService>();
 
+// ElasticSearch
+builder.Services.AddScoped<ISearchIndexService, ElasticSearchService>();
+
 var host = builder.Build();
 host.Run();

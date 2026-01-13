@@ -44,10 +44,22 @@ namespace PaperlessREST.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAllDocuments()
         {
+            try
+            {
             int userId = GetUserId();
             List<OwnDocumentDto> docs = await _documentService.GetAllDocumentsAsync(userId);
 
             return Ok(docs);    // 200 Ok
+        }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized();  // 401 Unauthorized
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error fetching document");
+                return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
+            }
         }
 
         [HttpGet("{id}")]
@@ -56,7 +68,7 @@ namespace PaperlessREST.Controllers
             if (id < 1)
             {
                 _logger.LogWarning($"Invalid document ID: {id}");
-                return BadRequest($"Invalid document ID: {id}"); // 400 Bad Request
+                return BadRequest($"Invalid document ID: {id}");    // 400 Bad Request
             }
 
             try
@@ -80,7 +92,34 @@ namespace PaperlessREST.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Unexpected error deleting document {id}");
+                _logger.LogError(ex, $"Unexpected error fetching document {id}");
+                return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
+            }
+        }
+
+        [HttpGet("search/{searchText}")]
+        public async Task<IActionResult> SearchDocument([FromRoute] string searchText)
+        {
+            if (string.IsNullOrEmpty(searchText))
+            {
+                _logger.LogWarning($"Invalid search text: {searchText}");
+                return BadRequest($"Invalid search text: {searchText}");    // 400 Bad Request
+            }
+
+            try
+            {
+                int userId = GetUserId();
+                List<DocumentDto> docs = await _documentService.SearchDocumentAsync(searchText, userId);
+                
+                return Ok(docs);   // 200 Ok
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Unauthorized();  // 401 Unauthorized
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Unexpected error searching document");
                 return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
             }
         }
@@ -141,7 +180,7 @@ namespace PaperlessREST.Controllers
                 int userId = GetUserId();
                 await _documentService.DeleteDocumentAsync(id, userId);
                 
-                return NoContent(); // 204 No Content
+                return NoContent();     // 204 No Content
             }
             catch (UnauthorizedAccessException)
             {
@@ -200,7 +239,7 @@ namespace PaperlessREST.Controllers
             catch (UpdateException ex)
             {
                 _logger.LogError(ex, $"Failed to update document {id}");
-                return StatusCode(500, "Failed to update document due to an internal error");   // 500 Internal Server Error
+                return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
             }
         }
     }

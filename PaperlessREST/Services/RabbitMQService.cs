@@ -7,7 +7,7 @@ namespace PaperlessREST.Services
 {
     public interface IMessageQueueService
     {
-        Task PublishAsync(int id, string message);
+        Task PublishAsync(int id, string message, int userID);
     }
 
     public class RabbitMQService : IMessageQueueService, IAsyncDisposable
@@ -30,7 +30,7 @@ namespace PaperlessREST.Services
             _logger = logger;
         }
 
-        public async Task PublishAsync(int id, string fileName)
+        public async Task PublishAsync(int id, string fileName, int userID)
         {
             string queueName = "ocr_queue";
 
@@ -46,8 +46,8 @@ namespace PaperlessREST.Services
             var payload = new Dictionary<string, string>
             {
                 { "id", id.ToString() },
-                { "filename", fileName }
-
+                { "filename", fileName },
+                { "userID", userID.ToString() }
             };
 
             var json = JsonSerializer.Serialize(payload);

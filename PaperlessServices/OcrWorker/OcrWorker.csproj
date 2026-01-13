@@ -12,6 +12,11 @@
     <PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
     <PackageReference Include="Minio" Version="7.0.0" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="Elastic.Clients.Elasticsearch" Version="8.15.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\PaperlessModels\PaperlessModels.csproj" />
   </ItemGroup>
 
 </Project>

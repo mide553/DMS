@@ -103,6 +103,9 @@ builder.Services.AddSingleton<IDocumentStorageService, MinIOService>();
 // RabbitMQ
 builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
 
+// ElasticSearch
+builder.Services.AddSingleton<ISearchIndexService, ElasticSearchService>();
+
 // Worker
 builder.Services.AddHostedService<Worker>();
 

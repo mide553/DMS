@@ -11,6 +11,7 @@ namespace PaperlessREST.Services
     {
         public Task<List<OwnDocumentDto>> GetAllDocumentsAsync(int userId);
         public Task<DocumentDto> GetDocumentByIdAsync(int id, int userId);
+        public Task<List<DocumentDto>> SearchDocumentAsync(string searchText, int userId);
         public Task<Document> UploadDocumentAsync(IFormFile file, int userId);
         public Task DeleteDocumentAsync(int id, int userId);
         public Task<DocumentDto> UpdateDocumentAsync(int id, DocumentDto docDto, int userId);
@@ -22,14 +23,16 @@ namespace PaperlessREST.Services
         private readonly IMapper _mapper;
         private readonly IDocumentStorageService _documentStorage;
         private readonly IMessageQueueService _queueService;
+        private readonly ISearchIndexService _searchIndexService;
         private readonly ILogger<DocumentService> _logger;
 
-        public DocumentService(ApplicationDBContext dbContext, IMapper mapper, IDocumentStorageService documentStorage, IMessageQueueService queueService, ILogger<DocumentService> logger)
+        public DocumentService(ApplicationDBContext dbContext, IMapper mapper, IDocumentStorageService documentStorage, IMessageQueueService queueService, ISearchIndexService searchIndexService, ILogger<DocumentService> logger)
         {
             _context = dbContext;
             _mapper = mapper;
             _documentStorage = documentStorage;
             _queueService = queueService;
+            _searchIndexService = searchIndexService;
             _logger = logger;
         }
 
@@ -70,6 +73,35 @@ namespace PaperlessREST.Services
             return _mapper.Map<DocumentDto>(doc);
         }
 
+        public async Task<List<DocumentDto>> SearchDocumentAsync(string searchText, int userId)
+        {
+            _logger.LogInformation($"Searching document for user {userId} containing text {searchText}");
+
+            var result = await _searchIndexService.SearchAsync(searchText, userId);
+
+            if (result == null || result.Count == 0) 
+            {
+                _logger.LogInformation($"No documents of user {userId} found containing text {searchText}");
+                return new List<DocumentDto>();     // return empty list
+            }
+
+            // Get document objects of result
+            List<DocumentDto> docs = new List<DocumentDto>();
+            foreach (var doc in result)
+            {
+                try
+                {
+                    docs.Add(await GetDocumentByIdAsync(doc.DocumentId, userId));
+                }
+                catch 
+                {
+                    _logger.LogInformation($"Skipping Document with ID {doc.DocumentId}");
+                }
+            }
+
+            return docs;
+        }
+
         public async Task<Document> UploadDocumentAsync(IFormFile file, int userId)
         {
             _logger.LogInformation($"Uploading new document for user {userId}");
@@ -108,7 +140,7 @@ namespace PaperlessREST.Services
 
                 // Add document to queue
 
-                await _queueService.PublishAsync(docModel.Id, storageFileName);
+                await _queueService.PublishAsync(docModel.Id, storageFileName, userId);
                 _logger.LogInformation($"Message successfully sent to queue");
 
                 return docModel;  // 201 Created
