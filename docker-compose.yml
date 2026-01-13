@@ -123,6 +123,28 @@ services:
     networks:
       - paperless-network
 
+  batchprocessor:
+    container_name: BatchProcessor
+    build:
+      context: .
+      dockerfile: ./PaperlessServices/BatchProcessor/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      BatchProcessor__Schedule: "0 1 * * *"
+      BatchProcessor__RunOnStartup: "true"
+      BatchProcessor__InputFolder: "/data/input"
+      BatchProcessor__FilePattern: "access-log-*.xml"
+      BatchProcessor__ArchiveFolder: "/data/archive"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - batch_input:/data/input
+      - batch_archive:/data/archive
+    networks:
+      - paperless-network
+
   api:
     build:
       context: .
@@ -182,3 +204,5 @@ volumes:
   minio_data:
   rabbitmq_data:
   elasticsearch_data:
+  batch_input:
+  batch_archive:

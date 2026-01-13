@@ -17,6 +17,11 @@ namespace PaperlessModels.Models
 
         public DateTime LastModified { get; set; } = DateTime.UtcNow;
 
+        // Access statistics
+        public int? AccessCount { get; set; } = 0;
+        
+        public DateTime? LastAccessDate { get; set; }
+
         // Foreign key to User
         [Required]
         public int UserId { get; set; }

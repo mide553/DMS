@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AccessLog date="2026-01-12">
+  <Document id="1" accessCount="12" />
+  <Document id="2" accessCount="5" />
+  <Document id="3" accessCount="18" />
+  <Document id="6" accessCount="9" />
+  <Document id="7" accessCount="31" />
+</AccessLog>

@@ -51,6 +51,17 @@ tagging and full text search (ElasticSearch).
   - Session management with auto-redirect
   - Swagger UI with JWT authorization support
 
+### Sprint 7: Integration-Test, Batch-Processing, Finalization
+- Integration tests for document upload use case
+- **Batch Processing Service**:
+  - Scheduled service for processing daily XML access logs
+  - Reads XML files from external systems
+  - Updates document access statistics in database
+  - Configurable schedule (default: daily at 01:00 AM)
+  - Automatic file archiving after processing
+  - Configurable input folder and filename patterns
+  - Database schema extended with AccessCount and LastAccessDate fields
+
 **Current Access Points:**
 - **Web UI:** http://localhost:8080 (Login required)
 - **REST API:** http://localhost:5000/api/documents (Auth required)
@@ -174,3 +185,51 @@ tagging and full text search (ElasticSearch).
 - Swagger documentation available with JWT authorization support (http://localhost:5000/swagger/index.html)
 - API enforces user-specific access - users can only manage their own documents
 
+### 5. Automated Batch Processing of Access Logs
+**Actor**: System Administrator / External Systems
+**Current Implementation**:
+- External systems generate daily XML files containing document access statistics
+- XML files are placed in configured input folder (default: `/data/input`)
+- BatchProcessor service runs on schedule (default: daily at 01:00 AM)
+- Service reads all XML files matching pattern `access-log-*.xml`
+- Each document's access count is updated in PostgreSQL database
+- Processed files are automatically archived with timestamp to prevent reprocessing
+- Configuration allows customization of:
+  - Schedule (via cron expression)
+  - Input folder path
+  - Filename pattern
+  - Archive folder path
+- Database schema includes:
+  - `AccessCount`: Cumulative number of document accesses
+  - `LastAccessDate`: Timestamp of last access statistics update
+
+**XML Format**:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<AccessLog date="2026-01-13">
+  <Document id="1" accessCount="15" />
+  <Document id="2" accessCount="8" />
+  <Document id="3" accessCount="23" />
+</AccessLog>
+```
+
+**Testing the Batch Process**:
+1. Copy sample XML files to the batch input volume:
+   ```bash
+   docker cp PaperlessServices/BatchProcessor/sample-access-log-2026-01-13.xml BatchProcessor:/data/input/
+   ```
+
+2. Check the BatchProcessor logs:
+   ```bash
+   docker logs BatchProcessor
+   ```
+
+3. Query the database to verify access statistics:
+   ```sql
+   SELECT Id, FileName, AccessCount, LastAccessDate FROM Documents WHERE AccessCount > 0;
+   ```
+
+4. Verify archived files:
+   ```bash
+   docker exec BatchProcessor ls -la /data/archive
+   ```
