@@ -6,6 +6,9 @@
             "BatchProcessor": "Debug"
         }
     },
+    "ConnectionStrings": {
+        "DefaultConnection": "<YOUR-CONNECTION-STRING>"
+    },
     "BatchProcessor": {
         "Schedule": "0 1 * * *",
         "RunOnStartup": true,
