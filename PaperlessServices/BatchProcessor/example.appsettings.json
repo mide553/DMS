@@ -1,0 +1,16 @@
+{
+    "Logging": {
+        "LogLevel": {
+            "Default": "Information",
+            "Microsoft.Hosting.Lifetime": "Information",
+            "BatchProcessor": "Debug"
+        }
+    },
+    "BatchProcessor": {
+        "Schedule": "0 1 * * *",
+        "RunOnStartup": true,
+        "InputFolder": "/data/input",
+        "FilePattern": "access-log-*.xml",
+        "ArchiveFolder": "/data/archive"
+    }
+}
