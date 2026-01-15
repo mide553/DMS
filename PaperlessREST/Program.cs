@@ -1,10 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 using System.Text;
 using PaperlessREST;
-using PaperlessREST.Controllers;
 using PaperlessREST.Data;
 using PaperlessREST.Services;
 
@@ -43,10 +42,20 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // DBContext
-builder.Services.AddDbContext<ApplicationDBContext>(options =>
+if (builder.Environment.IsEnvironment("Testing"))
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
-});
+    builder.Services.AddDbContext<ApplicationDBContext>(options =>
+    {
+        options.UseInMemoryDatabase("TestDb");
+    });
+}
+else
+{
+    builder.Services.AddDbContext<ApplicationDBContext>(options =>
+    {
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    });
+}
 
 // JWT Authentication
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "your-super-secret-key-minimum-32-characters-long-for-security";
@@ -99,7 +108,7 @@ builder.Services.AddAutoMapper(typeof(Program));
 
 // MinIO
 builder.Services.AddSingleton<IDocumentStorageService, MinIOService>();
-
+    
 // RabbitMQ
 builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
 
@@ -116,7 +125,12 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
-    db.Database.Migrate();
+
+    // Only run migrations outside Testing
+    if (!app.Environment.IsEnvironment("Testing") && db.Database.IsRelational())
+    {
+        db.Database.Migrate();
+    }
 }
 
 // Configure the HTTP request pipeline.
@@ -136,3 +150,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// required for integration tests
+public partial class Program { }
