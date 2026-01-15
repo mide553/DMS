@@ -1,38 +1,31 @@
 using OcrWorker.Exceptions;
 using OcrWorker.Services;
 using PaperlessModels.DTOs;
-using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
 
 namespace OcrWorker
 {
-    public interface IWorker
+    public interface IMessageQueueHandler
     {
-        public Task<string> ProcessDocumentAsync(string localPath);
+        public Task HandleMessageAsync(byte[] messageBytes);
+        public Task ProcessDocumentAsync(int id, string fileName, int userId);
+        public Task PublishMessageAsync(int id, string text);
     }
 
-    public class Worker : BackgroundService, IWorker, IAsyncDisposable
+    public class Worker : BackgroundService, IMessageQueueHandler
     {
-        private readonly IConnection _connection;
-        private readonly IChannel _channel;
+        private readonly IMessageQueueService _messageQueueService;
         private readonly IDocumentStorageService _documentStorage;
         private readonly IDocumentExtractorService _documentExtractor;
         private readonly ISearchIndexService _searchIndexService;
         private readonly ILogger<Worker> _logger;
+        private readonly string _subscribeQueueName = "ocr_queue";
+        private readonly string _publishQueueName = "genai_queue";
 
-        public Worker(IDocumentStorageService documentStorage, IDocumentExtractorService documentExtractor, IConfiguration config, ISearchIndexService searchIndexService, ILogger<Worker> logger)
+        public Worker(IMessageQueueService messageQueueService, IDocumentStorageService documentStorage, IDocumentExtractorService documentExtractor, ISearchIndexService searchIndexService, ILogger<Worker> logger)
         {
-            var factory = new ConnectionFactory
-            {
-                HostName = config["RABBITMQ_HOST"] ?? throw new MissingConfigurationItemException("RabbitMQ Host"),
-                UserName = config["RABBITMQ_USER"] ?? throw new MissingConfigurationItemException("RabbitMQ User"),
-                Password = config["RABBITMQ_PASSWORD"] ?? throw new MissingConfigurationItemException("RabbitMQ Password")
-            };
-            _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
-            _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
-
+            _messageQueueService = messageQueueService;
             _documentStorage = documentStorage;
             _documentExtractor = documentExtractor;
             _searchIndexService = searchIndexService;
@@ -41,157 +34,114 @@ namespace OcrWorker
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Declare Queue
-            string queueName = "ocr_queue";
-            await _channel.QueueDeclareAsync(
-                queue: queueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false
-            );
+            // Subscribe to RabbitMQ
+            await _messageQueueService.SubscribeAsync(_subscribeQueueName, this);
 
-            // Create Consumer
-            var consumer = new AsyncEventingBasicConsumer(_channel);
-            consumer.ReceivedAsync += async (model, ea) =>
-            {
-                try
-                {
-                    // Get message
-                    var json = Encoding.UTF8.GetString(ea.Body.ToArray());
-                    var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-
-                    if (!message.TryGetValue("id", out var idString) ||
-                    !int.TryParse(idString, out int id))
-                    {
-                        throw new InvalidMessageException("id");
-                    }
-
-                    if (!message.TryGetValue("filename", out var fileName) ||
-                        string.IsNullOrWhiteSpace(fileName))
-                    {
-                        throw new InvalidMessageException("filename");
-                    }
-
-                    if (!message.TryGetValue("userId", out var userIdString) ||
-                    !int.TryParse(userIdString, out int userId))
-                    {
-                        throw new InvalidMessageException("userId");
-                    }
-
-                    _logger.LogInformation($"Received OCR job for {fileName}");
-
-                    var localPath = Path.Combine("/tmp", fileName);
-                    try
-                    {
-                        // Download file
-                        await _documentStorage.DownloadFileAsync(fileName, localPath);
-
-                        // Perform OCR
-                        string text = await ProcessDocumentAsync(localPath);
-
-                        // Send text to summarizer
-                        await PublishForSummarizer(id, text);
-
-                        // Index document
-                        IndexedDocument document = new IndexedDocument
-                        {
-                            DocumentId = id,
-                            UserId = userId,
-                            Content = text
-                        };
-                        await _searchIndexService.IndexAsync(document);
-
-                        // Acknowledge message (deletes from queue)
-                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                    }
-                    catch (Exception ex)
-                    {
-                        // Delete temp file after upload
-                        if (Path.Exists(localPath)) 
-                            System.IO.File.Delete(localPath);
-
-                        throw new OcrWorkerProcessException(ex);
-                    }
-                }
-                catch (InvalidMessageException ex)
-                {
-                    _logger.LogError(ex, "Invalid message received - discarding");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                }
-                catch (OcrWorkerProcessException ex)
-                {
-                    _logger.LogError(ex, "Error processing message");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unexpected error");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                }
-            };
-
-            // Consume message from Queue
-            await _channel.BasicConsumeAsync(
-                queue: queueName,
-                autoAck: false,
-                consumer: consumer
-            );
-
+            // Keep running until cancellation
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        public async Task<string> ProcessDocumentAsync(string localPath)
+        public async Task HandleMessageAsync(byte[] messageBytes)
+        {
+            try
+            {
+                // Get message
+                var json = Encoding.UTF8.GetString(messageBytes);
+                var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+
+                if (!message.TryGetValue("id", out var idString) ||
+                !int.TryParse(idString, out int id))
+                {
+                    throw new InvalidMessageException("id");
+                }
+
+                if (!message.TryGetValue("filename", out var fileName) ||
+                    string.IsNullOrWhiteSpace(fileName))
+                {
+                    throw new InvalidMessageException("filename");
+                }
+
+                if (!message.TryGetValue("userId", out var userIdString) ||
+                !int.TryParse(userIdString, out int userId))
+                {
+                    throw new InvalidMessageException("userId");
+                }
+
+                _logger.LogInformation($"Received OCR job for document {id}");
+
+                await ProcessDocumentAsync(id, fileName, userId);
+            }
+            catch (InvalidMessageException ex)
+            {
+                _logger.LogError(ex, "Invalid message received - discarding");
+            }
+            catch (OcrWorkerProcessException ex)
+            {
+                _logger.LogError(ex, "Error processing message");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error");
+            }
+        }
+        
+        public async Task ProcessDocumentAsync(int id, string fileName, int userId)
+        {
+            var localPath = Path.Combine("/tmp", fileName);
+            try
+            {
+                // Download file
+                await _documentStorage.DownloadFileAsync(fileName, localPath);
+
+                // Perform OCR
+                string text = await ExtractTextAsync(localPath);
+
+                // Send text to summarizer
+                await PublishMessageAsync(id, text);
+
+                // Index document
+                IndexedDocument document = new IndexedDocument
+                {
+                    DocumentId = id,
+                    UserId = userId,
+                    Content = text
+                };
+                await _searchIndexService.IndexAsync(document);
+
+                _logger.LogInformation($"Finished process on document {id}");
+            }
+            catch (Exception ex)
+            {
+                // Delete temp file after upload
+                if (Path.Exists(localPath))
+                    System.IO.File.Delete(localPath);
+
+                throw new OcrWorkerProcessException(ex);
+            }
+        }
+
+        public async Task<string> ExtractTextAsync(string localPath)
         {
             string fileName = Path.GetFileName(localPath);
-            
+
             // Extract text from document
-            string text = _documentExtractor.ExtractDocument(localPath);
+            string text = await _documentExtractor.ExtractDocument(localPath);
 
             _logger.LogInformation($"Finished process on document {fileName}");
             return text;
         }
 
-        private async Task PublishForSummarizer(int id, string text)
+        public async Task PublishMessageAsync(int id, string text)
         {
-            // Declare Queue
-            string summarizerQueueName = "genai_queue";
-            await _channel.QueueDeclareAsync(
-                summarizerQueueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false
-            );
-
-            // Publish message
             var payload = new Dictionary<string, string>
             {
                 { "id", id.ToString() },
                 { "text", text }
             };
 
-            var json = JsonSerializer.Serialize(payload);
-            var body = Encoding.UTF8.GetBytes(json);
+            await _messageQueueService.PublishAsync(_publishQueueName, payload);
 
-            await _channel.BasicPublishAsync<BasicProperties>(
-                exchange: "",
-                routingKey: summarizerQueueName,
-                mandatory: false,
-                basicProperties: new BasicProperties(),
-                body: body
-            );
-            _logger.LogInformation($"Text in queue {summarizerQueueName} ready to be summarized");
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            _logger.LogInformation("Stopping OCR worker...");
-            // Close channel
-            if (_channel is not null)
-                await _channel.CloseAsync();
-
-            // Close connection
-            if (_connection is not null)
-                await _connection.CloseAsync();
+            _logger.LogInformation($"Text in queue {_publishQueueName} ready to be summarized");
         }
     }
 }

@@ -2,8 +2,8 @@
 using AutoMapper;
 using PaperlessREST.Data;
 using PaperlessREST.Exceptions;
-using PaperlessModels.Models;
 using PaperlessModels.DTOs;
+using PaperlessModels.Models;
 
 namespace PaperlessREST.Services
 {
@@ -139,8 +139,13 @@ namespace PaperlessREST.Services
                 await _context.SaveChangesAsync();
 
                 // Add document to queue
-
-                await _queueService.PublishAsync(docModel.Id, storageFileName, userId);
+                var payload = new Dictionary<string, string>
+                {
+                    { "id", docModel.Id.ToString() },
+                    { "filename", storageFileName },
+                    { "userId", userId.ToString() }
+                };
+                await _queueService.PublishAsync("ocr_queue", payload);
                 _logger.LogInformation($"Message successfully sent to queue");
 
                 return docModel;  // 201 Created

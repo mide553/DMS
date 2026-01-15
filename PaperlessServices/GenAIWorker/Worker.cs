@@ -1,167 +1,109 @@
 using GenAIWorker.Exceptions;
 using GenAIWorker.Services;
-using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
 
 namespace GenAIWorker
 {
-    public interface IWorker
+    public interface IMessageQueueHandler
     {
-        public Task ProcessText(string text);
+        public Task HandleMessageAsync(byte[] messageBytes);
+        public Task<string> ProcessTextAsync(string text);
+        public Task PublishMessageAsync(int id, string summary);
     }
-    public class Worker : BackgroundService, IAsyncDisposable
+    public class Worker : BackgroundService, IMessageQueueHandler
     {
-        private readonly IConnection _connection;
-        private readonly IChannel _channel;
+        private readonly IMessageQueueService _messageQueueService;
         private readonly ISummarizer _summarizer;
         private readonly ILogger<Worker> _logger;
+        private readonly string _subscribeQueueName = "genai_queue";
+        private readonly string _publishQueueName = "result_queue";
 
-        public Worker(ISummarizer summarizer, IConfiguration config, ILogger<Worker> logger)
+        public Worker(IMessageQueueService messageQueueService, ISummarizer summarizer, ILogger<Worker> logger)
         {
-            var factory = new ConnectionFactory
-            {
-                HostName = config["RABBITMQ_HOST"] ?? throw new MissingConfigurationItemException("RabbitMQ Host"),
-                UserName = config["RABBITMQ_USER"] ?? throw new MissingConfigurationItemException("RabbitMQ User"),
-                Password = config["RABBITMQ_PASSWORD"] ?? throw new MissingConfigurationItemException("RabbitMQ Password")
-            };
-            _connection = factory.CreateConnectionAsync("OcrWorker-Connection").GetAwaiter().GetResult();
-            _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
-
+            _messageQueueService = messageQueueService;
             _summarizer = summarizer;
             _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Declare Queue
-            string queueName = "genai_queue";
-            await _channel.QueueDeclareAsync(
-                queue: queueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false
-            );
+            // Subscribe to RabbitMQ
+            await _messageQueueService.SubscribeAsync(_subscribeQueueName, this);
 
-            // Create Consumer
-            var consumer = new AsyncEventingBasicConsumer(_channel);
-            consumer.ReceivedAsync += async (model, ea) =>
-            {
-                try
-                {
-                    // Get message
-                    var json = Encoding.UTF8.GetString(ea.Body.ToArray());
-                    var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-
-                    if (!message.TryGetValue("id", out var idString) ||
-                        !int.TryParse(idString, out int id))
-                    {
-                        throw new InvalidMessageException("id");
-                    }
-
-                    if (!message.TryGetValue("text", out var text) ||
-                        string.IsNullOrWhiteSpace(text))
-                    {
-                        throw new InvalidMessageException("text");
-                    }
-
-                    _logger.LogInformation($"Received summarizing job for document {id}");
-
-                    try
-                    {
-                        // Process text
-                        string summary = await ProcessText(text);
-
-                        // Send summary to api
-                        await PublishForApiAsync(id, summary);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new GenaiWorkerProcessException(ex);
-                    }
-
-                    // Acknowledge message (deletes from queue)
-                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                }
-                catch (InvalidMessageException ex)
-                {
-                    _logger.LogError(ex, "Invalid message received - discarding");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                }
-                catch (GenaiWorkerProcessException ex)
-                {
-                    _logger.LogError(ex, "Error summarizing document text");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unexpected error");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                }
-            };
-
-            // Consume message from Queue
-            await _channel.BasicConsumeAsync(
-                queue: queueName,
-                autoAck: false,
-                consumer:
-                consumer
-            );
-
+            // Keep running until cancellation
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 
-        public async Task<string> ProcessText(string text)
+        public async Task HandleMessageAsync(byte[] messageBytes)
         {
-            // Summarize text
-            string summary = await _summarizer.SummarizeTextAsync(text);
-            _logger.LogInformation($"Finished process on text");
+            try
+            {
+                // Get message
+                var json = Encoding.UTF8.GetString(messageBytes);
+                var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
 
-            return summary;
+                if (!message.TryGetValue("id", out var idString) ||
+                    !int.TryParse(idString, out int id))
+                {
+                    throw new InvalidMessageException("id");
+                }
+
+                if (!message.TryGetValue("text", out var text) ||
+                    string.IsNullOrWhiteSpace(text))
+                {
+                    throw new InvalidMessageException("text");
+                }
+
+                _logger.LogInformation($"Received summarizing job for document {id}");
+
+                // Process text
+                string summary = await ProcessTextAsync(text);
+
+                // Send summary to api
+                await PublishMessageAsync(id, summary);
+            }
+            catch (InvalidMessageException ex)
+            {
+                _logger.LogError(ex, "Invalid message received - discarding");
+            }
+            catch (GenaiWorkerProcessException ex)
+            {
+                _logger.LogError(ex, "Error summarizing document text");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error");
+            }
         }
 
-        private async Task PublishForApiAsync(int id, string summary)
+        public async Task<string> ProcessTextAsync(string text)
         {
-            // Declare Queue
-            string resultQueueName = "result_queue";
-            await _channel.QueueDeclareAsync(
-                resultQueueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false
-            );
+            try
+            {
+                // Summarize text
+                string summary = await _summarizer.SummarizeTextAsync(text);
+                _logger.LogInformation($"Finished process on text");
 
-            // Publish message
+                return summary;
+            }
+            catch (Exception ex)
+            {
+                throw new GenaiWorkerProcessException(ex);
+            }
+        }
+
+        public async Task PublishMessageAsync(int id, string summary)
+        {
             var payload = new Dictionary<string, string>
             {
                 { "id", id.ToString() },
                 { "summary", summary }
             };
 
-            var json = JsonSerializer.Serialize(payload);
-            var body = Encoding.UTF8.GetBytes(json);
-
-            await _channel.BasicPublishAsync<BasicProperties>(
-                exchange: "",
-                routingKey: resultQueueName,
-                mandatory: false,
-                basicProperties: new BasicProperties(),
-                body: body
-            );
-            _logger.LogInformation($"Summary in queue ready to be saved");
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            _logger.LogInformation("Stopping GenAI worker...");
-            // Close channel
-            if (_channel is not null)
-                await _channel.CloseAsync();
-
-            // Close connection
-            if (_connection is not null)
-                await _connection.CloseAsync();
+            await _messageQueueService.PublishAsync(_publishQueueName, payload);
+            
+            _logger.LogInformation($"Summary in queue {_publishQueueName} ready to be saved");
         }
     }
 }

@@ -5,7 +5,7 @@ namespace OcrWorker.Services
 {
     public interface IDocumentExtractorService
     {
-        public string ExtractDocument(string localPath);
+        public Task<string> ExtractDocument(string localPath);
     }
 
     public class TesseractService : IDocumentExtractorService
@@ -17,7 +17,7 @@ namespace OcrWorker.Services
             _logger = logger;
         }
 
-        public string ExtractDocument(string localPath)
+        public async Task<string> ExtractDocument(string localPath)
         {
             string fileName = Path.GetFileName(localPath);
 
@@ -36,7 +36,7 @@ namespace OcrWorker.Services
                 // Convert PDF to PNG
                 if (Path.GetExtension(fileName) == ".pdf")
                 {
-                    localPath = PdfToPngConverter(localPath);
+                    localPath = await ConvertPdfToPngAsync(localPath);
                 }
 
                 using var engine = new TesseractEngine("/usr/share/tesseract-ocr/5/tessdata", "eng", EngineMode.Default);
@@ -69,7 +69,7 @@ namespace OcrWorker.Services
             }
         }
 
-        private string PdfToPngConverter(string localPath)
+        private Task<string> ConvertPdfToPngAsync(string localPath)
         {
             string outputBase = Path.Combine(Path.GetTempPath(), Path.GetFileNameWithoutExtension(localPath));
             string outputPattern = $"{outputBase}-%03d.png";
@@ -96,9 +96,11 @@ namespace OcrWorker.Services
                 }
             }
 
-            _logger.LogInformation($"Converted pdf to image");
             // Pick the first page for OCR (can be extended to multi-page)
-            return $"{outputBase}-001.png";
+            string imageFileName = $"{outputBase}-001.png";
+            
+            _logger.LogInformation($"Converted pdf to image");
+            return Task.FromResult(imageFileName);
         }
     }
 }

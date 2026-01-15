@@ -2,9 +2,9 @@
 using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
-using PaperlessREST.Exceptions;
+using GenAIWorker.Exceptions;
 
-namespace PaperlessREST.Services
+namespace GenAIWorker.Services
 {
     public interface IMessageQueueService
     {
@@ -27,7 +27,7 @@ namespace PaperlessREST.Services
                 Password = config["RABBITMQ_PASSWORD"] ?? throw new MissingConfigurationItemException("RabbitMQ Password")
             };
 
-            _connection = factory.CreateConnectionAsync("PaperlessREST-Connection").GetAwaiter().GetResult();
+            _connection = factory.CreateConnectionAsync("GenAIWorker-Connection").GetAwaiter().GetResult();
             _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
             _logger = logger;
         }
