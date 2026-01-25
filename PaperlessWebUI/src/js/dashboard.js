@@ -199,25 +199,21 @@ class Dashboard {
         }
     }
 
-    filterDocuments() {
-        const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    async filterDocuments() {
+        const searchTerm = document.getElementById('searchInput')?.value.trim() || '';
 
-        if (!searchTerm) {
-            this.filteredDocuments = [...this.documents];
-        } else {
-            this.filteredDocuments = this.documents.filter(doc => {
-                const fileName = (doc.fileName || doc.FileName || doc.name || '').toLowerCase();
-                let fileType = (doc.filetype || doc.FileType || '').toLowerCase();
-
-                if (!fileType && fileName.includes('.')) {
-                    fileType = fileName.split('.').pop().toLowerCase();
-                }
-
-                return fileName.includes(searchTerm) || fileType.includes(searchTerm);
-            });
+        try {
+            if (!searchTerm) {
+                this.filteredDocuments = [...this.documents];
+            } else {
+                // Use Elasticsearch API for search
+                this.filteredDocuments = await documentService.searchDocuments(searchTerm);
+            }
+            this.renderDocuments();
+        } catch (error) {
+            console.error('Search failed:', error);
+            utils.showError('errorMessage', error.message);
         }
-
-        this.renderDocuments();
     }
 
     renderDocuments() {
@@ -227,13 +223,15 @@ class Dashboard {
 
         if (!documentsGrid || !noDocuments) return;
 
-        const hasSearchTerm = document.getElementById('searchInput')?.value.trim() !== '';
+        const searchInput = document.getElementById('searchInput');
+        const hasSearchTerm = searchInput && searchInput.value.trim() !== '';
+        const hasDocuments = this.documents && this.documents.length > 0;
 
         if (this.filteredDocuments.length === 0) {
             documentsGrid.style.display = 'none';
 
             // Show different message based on whether user is searching
-            if (hasSearchTerm && this.documents.length > 0) {
+            if (hasSearchTerm && hasDocuments) {
                 noDocuments.style.display = 'none';
                 if (noSearchResults) noSearchResults.style.display = 'block';
             } else {

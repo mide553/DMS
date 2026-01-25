@@ -128,6 +128,19 @@ class DocumentService {
         }
     }
 
+    // Search documents using Elasticsearch
+    async searchDocuments(searchText) {
+        try {
+            if (!searchText || searchText.trim() === '') {
+                return await this.getAllDocuments();
+            }
+            return await this.apiClient.get(`/documents/search/${encodeURIComponent(searchText)}`);
+        } catch (error) {
+            console.error('Failed to search documents:', error);
+            throw new Error('Failed to search documents. Please try again.');
+        }
+    }
+
     // Get document by ID
     async getDocumentById(id) {
         try {
