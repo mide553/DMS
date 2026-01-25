@@ -13,7 +13,7 @@ namespace GenAIWorker.Services
         private readonly string _apiKey;
         ILogger<GenAIService> _logger;
 
-        public GenAIService(IConfiguration config, ILogger<GenAIService> logger) 
+        public GenAIService(IConfiguration config, ILogger<GenAIService> logger)
         {
             _apiKey = config["GEMINI_API_KEY"] ?? throw new MissingConfigurationItemException("Gemini API Key");
             _logger = logger;
@@ -49,7 +49,7 @@ namespace GenAIWorker.Services
 
                 // Check quality
                 int MIN_LENGTH = 15;
-                if (summary.Length <  MIN_LENGTH)
+                if (summary.Length < MIN_LENGTH)
                 {
                     throw new SummaryQualityException();
                 }

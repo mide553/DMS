@@ -74,7 +74,7 @@ namespace PaperlessREST.Services
                 try
                 {
                     await handler.HandleMessageAsync(ea.Body.ToArray());
-                    
+
                     // Acknowledge message (deletes from queue)
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 }
@@ -89,8 +89,8 @@ namespace PaperlessREST.Services
 
             // Consume message from Queue
             await _channel.BasicConsumeAsync(
-                queue: queueName, 
-                autoAck: false, 
+                queue: queueName,
+                autoAck: false,
                 consumer: consumer
             );
         }

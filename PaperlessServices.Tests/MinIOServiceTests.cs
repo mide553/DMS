@@ -28,7 +28,7 @@ public class MinIOServiceTests
     {
         string documentName = "document.pdf";
         string filePath = "/tmp/document.pdf";
-        
+
         _documentStorage
             .Setup(x => x.DownloadFileAsync(It.IsAny<string>(), It.IsAny<string>()))
             .Throws(new MinioDocumentDownloadException(documentName, new Exception()));

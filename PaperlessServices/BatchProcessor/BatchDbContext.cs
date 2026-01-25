@@ -14,7 +14,7 @@ public class BatchDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        
+
         modelBuilder.Entity<Document>().ToTable("Documents");
     }
 }

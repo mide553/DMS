@@ -60,7 +60,7 @@ namespace PaperlessREST.Services
 
             return searchResponse.Documents.ToList();
         }
-        
+
         public async Task RemoveIndexAsync(int documentId)
         {
             var response = await _client.DeleteAsync<IndexedDocument>(documentId, i => i

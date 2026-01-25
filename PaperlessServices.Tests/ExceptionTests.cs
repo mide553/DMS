@@ -61,7 +61,7 @@ public class ExceptionTests
         string unsupportedExtension = ".exe";
 
         var exception = new UnsupportedFileExtensionException(unsupportedExtension);
-        
+
         Assert.That(exception.Message, Does.Contain($"Unsupported extension ({unsupportedExtension})"));
     }
 }

@@ -102,7 +102,7 @@ namespace GenAIWorker
             };
 
             await _messageQueueService.PublishAsync(_publishQueueName, payload);
-            
+
             _logger.LogInformation($"Summary in queue {_publishQueueName} ready to be saved");
         }
     }

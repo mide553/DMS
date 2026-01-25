@@ -93,8 +93,8 @@ public class XmlProcessorService : IXmlProcessorService
                     // Update access statistics
                     document.AccessCount = (document.AccessCount ?? 0) + record.AccessCount;
                     document.LastAccessDate = DateTime.UtcNow;
-                    
-                    _logger.LogDebug("Updated document {id}: AccessCount = {count}", 
+
+                    _logger.LogDebug("Updated document {id}: AccessCount = {count}",
                         document.Id, document.AccessCount);
                 }
                 else

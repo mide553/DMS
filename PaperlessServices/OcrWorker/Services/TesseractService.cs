@@ -98,7 +98,7 @@ namespace OcrWorker.Services
 
             // Pick the first page for OCR (can be extended to multi-page)
             string imageFileName = $"{outputBase}-001.png";
-            
+
             _logger.LogInformation($"Converted pdf to image");
             return Task.FromResult(imageFileName);
         }

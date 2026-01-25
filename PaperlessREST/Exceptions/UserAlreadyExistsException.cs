@@ -10,7 +10,7 @@
     {
         public RegisterConflictReason Reason { get; }
 
-        public UserAlreadyExistsException(RegisterConflictReason reason) : base($"{reason.ToString()} already exists") 
+        public UserAlreadyExistsException(RegisterConflictReason reason) : base($"{reason.ToString()} already exists")
         {
             Reason = reason;
         }

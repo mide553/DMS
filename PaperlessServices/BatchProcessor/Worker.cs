@@ -13,7 +13,7 @@ public class Worker : BackgroundService
     private DateTime _nextRun;
 
     public Worker(
-        ILogger<Worker> logger, 
+        ILogger<Worker> logger,
         IConfiguration configuration,
         IServiceProvider serviceProvider)
     {
@@ -26,7 +26,7 @@ public class Worker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("BatchProcessor Worker starting at: {time}", DateTimeOffset.Now);
-        
+
         // Parse cron expression
         try
         {
@@ -66,18 +66,18 @@ public class Worker : BackgroundService
     private async Task ProcessBatch(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Starting batch processing at: {time}", DateTimeOffset.Now);
-        
+
         try
         {
             using var scope = _serviceProvider.CreateScope();
             var xmlProcessor = scope.ServiceProvider.GetRequiredService<IXmlProcessorService>();
-            
+
             var inputFolder = _configuration["BatchProcessor:InputFolder"] ?? "/data/input";
             var filePattern = _configuration["BatchProcessor:FilePattern"] ?? "access-log-*.xml";
             var archiveFolder = _configuration["BatchProcessor:ArchiveFolder"] ?? "/data/archive";
-            
+
             await xmlProcessor.ProcessXmlFilesAsync(inputFolder, filePattern, archiveFolder, stoppingToken);
-            
+
             _logger.LogInformation("Batch processing completed successfully at: {time}", DateTimeOffset.Now);
         }
         catch (Exception ex)

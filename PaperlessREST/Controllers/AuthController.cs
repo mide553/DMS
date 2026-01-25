@@ -30,7 +30,7 @@ namespace PaperlessREST.Controllers
             try
             {
                 AuthResponseDto auth = await _authRepository.RegisterAsync(registerDto);
-            
+
                 return Ok(auth);    // 200 Ok
             }
             catch (UserAlreadyExistsException ex)

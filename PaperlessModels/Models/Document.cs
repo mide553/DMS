@@ -19,7 +19,7 @@ namespace PaperlessModels.Models
 
         // Access statistics
         public int? AccessCount { get; set; } = 0;
-        
+
         public DateTime? LastAccessDate { get; set; }
 
         // Foreign key to User

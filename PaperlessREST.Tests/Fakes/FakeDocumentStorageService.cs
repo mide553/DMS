@@ -5,7 +5,7 @@ namespace PaperlessREST.Tests.Fakes
     public class FakeDocumentStorageService : IDocumentStorageService
     {
         public List<string> Uploads = new List<string>();
-        
+
         public Task UploadFileAsync(string documentName, string filePath)
         {
             Uploads.Add(documentName);

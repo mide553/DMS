@@ -10,7 +10,7 @@ namespace PaperlessREST.Services
         public Task DeleteFileAsync(string documentName);
         public Task<bool> FileExistsAsync(string documentName);
     }
-    
+
     public class MinIOService : IDocumentStorageService
     {
         private readonly IMinioClient _client;

@@ -18,9 +18,9 @@ namespace PaperlessREST.Tests.Helpers
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var claims = new[] 
+            var claims = new[]
             {
-                new Claim(ClaimTypes.Name, "TestUser"), 
+                new Claim(ClaimTypes.Name, "TestUser"),
                 new Claim(ClaimTypes.NameIdentifier, "1")
             };
             var identity = new ClaimsIdentity(claims, "Test");

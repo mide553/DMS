@@ -45,13 +45,13 @@ namespace PaperlessREST
                 var json = Encoding.UTF8.GetString(messageBytes);
                 var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
 
-                if (!message.TryGetValue("id", out var idString) || 
+                if (!message.TryGetValue("id", out var idString) ||
                     !int.TryParse(idString, out int id))
                 {
                     throw new InvalidMessageException("id");
                 }
 
-                if (!message.TryGetValue("summary", out var summary) || 
+                if (!message.TryGetValue("summary", out var summary) ||
                     string.IsNullOrWhiteSpace(summary))
                 {
                     throw new InvalidMessageException("summary");

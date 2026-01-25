@@ -84,7 +84,7 @@ namespace OcrWorker
                 _logger.LogError(ex, "Unexpected error");
             }
         }
-        
+
         public async Task ProcessDocumentAsync(int id, string fileName, int userId)
         {
             var localPath = Path.Combine("/tmp", fileName);

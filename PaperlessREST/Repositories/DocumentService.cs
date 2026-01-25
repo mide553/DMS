@@ -70,7 +70,7 @@ namespace PaperlessREST.Repositories
                 _logger.LogWarning($"User {userId} attempted to see document {id} owned by user {doc.UserId}");
                 throw new ForbiddenContentException("Document", id, userId);
             }
-            
+
             return _mapper.Map<DocumentDto>(doc);
         }
 
@@ -80,7 +80,7 @@ namespace PaperlessREST.Repositories
 
             var result = await _searchIndexService.SearchAsync(searchText, userId);
 
-            if (result == null || result.Count == 0) 
+            if (result == null || result.Count == 0)
             {
                 _logger.LogInformation($"No documents of user {userId} found containing text {searchText}");
                 return new List<DocumentDto>();     // return empty list
@@ -94,7 +94,7 @@ namespace PaperlessREST.Repositories
                 {
                     docs.Add(await GetDocumentByIdAsync(doc.DocumentId, userId));
                 }
-                catch 
+                catch
                 {
                     _logger.LogInformation($"Skipping Document with ID {doc.DocumentId}");
                 }
