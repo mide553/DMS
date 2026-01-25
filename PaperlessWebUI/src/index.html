@@ -22,9 +22,15 @@
                 <div class="dashboard-header">
                     <h2>All Documents</h2>
                     <div class="search-container">
-                        <label for="searchInput" style="display: none;">Search documents</label>
-                        <input type="text" id="searchInput" placeholder="Search documents...">
-                        <button id="searchBtn" class="btn btn-secondary">Search</button>
+                        <div class="search-box">
+                            <label for="filenameSearchInput" style="display: none;">Search by filename</label>
+                            <input type="text" id="filenameSearchInput" placeholder="Search by filename...">
+                        </div>
+                        <div class="search-box">
+                            <label for="contentSearchInput" style="display: none;">Search content</label>
+                            <input type="text" id="contentSearchInput" placeholder="Search content...">
+                            <button id="contentSearchBtn" class="btn btn-secondary">Search Content</button>
+                        </div>
                         <button id="addDocumentBtn" class="btn btn-primary">Add Document</button>
                     </div>
                 </div>
@@ -89,7 +95,7 @@
         </div>
     </div>
 
-    <script src="js/api.js?v=8"></script>
-    <script src="js/dashboard.js?v=8"></script>
+    <script src="js/api.js?v=9"></script>
+    <script src="js/dashboard.js?v=9"></script>
 </body>
 </html>

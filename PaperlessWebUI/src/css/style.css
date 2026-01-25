@@ -83,12 +83,21 @@ header h1 {
 .search-container {
     display: flex;
     gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.search-box {
+    display: flex;
+    gap: 5px;
+    align-items: center;
 }
 
 .search-container input {
     padding: 8px;
     border: 1px solid #ddd;
     border-radius: 3px;
+    min-width: 200px;
 }
 
 /* Documents display */

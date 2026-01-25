@@ -28,12 +28,27 @@ class Dashboard {
     }
 
     bindEvents() {
-        const searchInput = document.getElementById('searchInput');
-        const searchBtn = document.getElementById('searchBtn');
+        const filenameSearchInput = document.getElementById('filenameSearchInput');
+        const contentSearchInput = document.getElementById('contentSearchInput');
+        const contentSearchBtn = document.getElementById('contentSearchBtn');
 
-        if (searchInput && searchBtn) {
-            searchInput.addEventListener('input', () => this.filterDocuments());
-            searchBtn.addEventListener('click', () => this.filterDocuments());
+        // Filename search - real-time filtering
+        if (filenameSearchInput) {
+            filenameSearchInput.addEventListener('input', () => this.filterByFilename());
+        }
+
+        // Content search - on button click
+        if (contentSearchBtn) {
+            contentSearchBtn.addEventListener('click', () => this.searchByContent());
+        }
+
+        // Allow Enter key to search content
+        if (contentSearchInput) {
+            contentSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.searchByContent();
+                }
+            });
         }
 
         const addDocumentBtn = document.getElementById('addDocumentBtn');
@@ -199,19 +214,40 @@ class Dashboard {
         }
     }
 
-    async filterDocuments() {
-        const searchTerm = document.getElementById('searchInput')?.value.trim() || '';
+    filterByFilename() {
+        const searchTerm = document.getElementById('filenameSearchInput')?.value.toLowerCase() || '';
+
+        if (!searchTerm) {
+            this.filteredDocuments = [...this.documents];
+        } else {
+            this.filteredDocuments = this.documents.filter(doc => {
+                const fileName = (doc.fileName || doc.FileName || doc.name || '').toLowerCase();
+                let fileType = (doc.filetype || doc.FileType || '').toLowerCase();
+
+                if (!fileType && fileName.includes('.')) {
+                    fileType = fileName.split('.').pop().toLowerCase();
+                }
+
+                return fileName.includes(searchTerm) || fileType.includes(searchTerm);
+            });
+        }
+
+        this.renderDocuments();
+    }
+
+    async searchByContent() {
+        const searchTerm = document.getElementById('contentSearchInput')?.value.trim() || '';
 
         try {
             if (!searchTerm) {
                 this.filteredDocuments = [...this.documents];
             } else {
-                // Use Elasticsearch API for search
+                // Use Elasticsearch API for content search
                 this.filteredDocuments = await documentService.searchDocuments(searchTerm);
             }
             this.renderDocuments();
         } catch (error) {
-            console.error('Search failed:', error);
+            console.error('Content search failed:', error);
             utils.showError('errorMessage', error.message);
         }
     }
@@ -223,15 +259,18 @@ class Dashboard {
 
         if (!documentsGrid || !noDocuments) return;
 
-        const searchInput = document.getElementById('searchInput');
-        const hasSearchTerm = searchInput && searchInput.value.trim() !== '';
+        const filenameInput = document.getElementById('filenameSearchInput');
+        const contentInput = document.getElementById('contentSearchInput');
+        const hasFilenameSearch = filenameInput && filenameInput.value.trim() !== '';
+        const hasContentSearch = contentInput && contentInput.value.trim() !== '';
+        const hasAnySearch = hasFilenameSearch || hasContentSearch;
         const hasDocuments = this.documents && this.documents.length > 0;
 
         if (this.filteredDocuments.length === 0) {
             documentsGrid.style.display = 'none';
 
             // Show different message based on whether user is searching
-            if (hasSearchTerm && hasDocuments) {
+            if (hasAnySearch && hasDocuments) {
                 noDocuments.style.display = 'none';
                 if (noSearchResults) noSearchResults.style.display = 'block';
             } else {
