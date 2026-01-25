@@ -29,6 +29,7 @@
     <ProjectReference Include="..\PaperlessServices\BatchProcessor\BatchProcessor.csproj" />
     <ProjectReference Include="..\PaperlessServices\GenAIWorker\GenAIWorker.csproj" />
     <ProjectReference Include="..\PaperlessServices\OcrWorker\OcrWorker.csproj" />
+
   </ItemGroup>
 
  </Project>
