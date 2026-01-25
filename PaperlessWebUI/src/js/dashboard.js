@@ -231,7 +231,7 @@ class Dashboard {
 
         if (this.filteredDocuments.length === 0) {
             documentsGrid.style.display = 'none';
-            
+
             // Show different message based on whether user is searching
             if (hasSearchTerm && this.documents.length > 0) {
                 noDocuments.style.display = 'none';
