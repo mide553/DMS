@@ -115,6 +115,7 @@ header h1 {
     cursor: pointer;
     overflow: hidden;
     max-width: 100%;
+    box-sizing: border-box;
 }
 
 .document-card:hover {
@@ -131,6 +132,8 @@ header h1 {
     hyphens: auto;
     max-width: 100%;
     overflow: hidden;
+    white-space: normal;
+    text-overflow: ellipsis;
 }
 
 .document-meta {
