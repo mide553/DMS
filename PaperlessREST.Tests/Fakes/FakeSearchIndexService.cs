@@ -9,5 +9,10 @@ namespace PaperlessREST.Tests.Fakes
         {
             return Task.FromResult(new List<IndexedDocument>());
         }
+
+        public Task RemoveIndexAsync(int id)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

@@ -35,6 +35,8 @@
   <ItemGroup>
     <ProjectReference Include="..\PaperlessModels\PaperlessModels.csproj" />
     <ProjectReference Include="..\PaperlessREST\PaperlessREST.csproj" />
+    <ProjectReference Include="..\PaperlessServices\PaperlessServices.csproj" />
+
   </ItemGroup>
 
 </Project>
