@@ -6,6 +6,9 @@ var builder = Host.CreateApplicationBuilder(args);
 // Worker
 builder.Services.AddHostedService<Worker>();
 
+// RabbitMQ
+builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
+
 // MinIO
 builder.Services.AddScoped<IDocumentStorageService, MinIOService>();
 

@@ -108,7 +108,7 @@ builder.Services.AddAutoMapper(typeof(Program));
 
 // MinIO
 builder.Services.AddSingleton<IDocumentStorageService, MinIOService>();
-    
+
 // RabbitMQ
 builder.Services.AddSingleton<IMessageQueueService, RabbitMQService>();
 
@@ -125,11 +125,30 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
     // Only run migrations outside Testing
     if (!app.Environment.IsEnvironment("Testing") && db.Database.IsRelational())
     {
-        db.Database.Migrate();
+        try
+        {
+            var pendingMigrations = await db.Database.GetPendingMigrationsAsync();
+            if (pendingMigrations.Any())
+            {
+                logger.LogInformation("Applying pending migrations...");
+                await db.Database.MigrateAsync();
+                logger.LogInformation("Migrations applied successfully");
+            }
+            else
+            {
+                logger.LogInformation("Database is up to date");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred while applying migrations. Database may already be initialized.");
+            // Continue startup
+        }
     }
 }
 
