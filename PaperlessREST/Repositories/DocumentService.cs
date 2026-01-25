@@ -4,10 +4,11 @@ using PaperlessREST.Data;
 using PaperlessREST.Exceptions;
 using PaperlessModels.DTOs;
 using PaperlessModels.Models;
+using PaperlessREST.Services;
 
-namespace PaperlessREST.Services
+namespace PaperlessREST.Repositories
 {
-    public interface IDocumentService
+    public interface IDocumentRepository
     {
         public Task<List<OwnDocumentDto>> GetAllDocumentsAsync(int userId);
         public Task<DocumentDto> GetDocumentByIdAsync(int id, int userId);
@@ -17,16 +18,16 @@ namespace PaperlessREST.Services
         public Task<DocumentDto> UpdateDocumentAsync(int id, DocumentDto docDto, int userId);
     }
 
-    public class DocumentService : IDocumentService
+    public class DocumentRepository : IDocumentRepository
     {
         private readonly ApplicationDBContext _context;
         private readonly IMapper _mapper;
         private readonly IDocumentStorageService _documentStorage;
         private readonly IMessageQueueService _queueService;
         private readonly ISearchIndexService _searchIndexService;
-        private readonly ILogger<DocumentService> _logger;
+        private readonly ILogger<DocumentRepository> _logger;
 
-        public DocumentService(ApplicationDBContext dbContext, IMapper mapper, IDocumentStorageService documentStorage, IMessageQueueService queueService, ISearchIndexService searchIndexService, ILogger<DocumentService> logger)
+        public DocumentRepository(ApplicationDBContext dbContext, IMapper mapper, IDocumentStorageService documentStorage, IMessageQueueService queueService, ISearchIndexService searchIndexService, ILogger<DocumentRepository> logger)
         {
             _context = dbContext;
             _mapper = mapper;
@@ -119,7 +120,7 @@ namespace PaperlessREST.Services
             try
             {
                 // Save uploaded file temporaryly inside container
-                using (var stream = System.IO.File.Create(tempPath))
+                using (var stream = File.Create(tempPath))
                 {
                     await file.CopyToAsync(stream);
                 }
@@ -131,12 +132,13 @@ namespace PaperlessREST.Services
                 Document docModel = new Document()
                 {
                     FileName = fileName,
-                    ByteSize = (long)file.Length,
-                    UserId = (int)userId
+                    ByteSize = file.Length,
+                    UserId = userId
                 };
 
                 _context.Documents.Add(docModel);
                 await _context.SaveChangesAsync();
+                _logger.LogInformation($"Document successfully uploaded (ID: {docModel.Id})");
 
                 // Add document to queue
                 var payload = new Dictionary<string, string>
@@ -146,7 +148,6 @@ namespace PaperlessREST.Services
                     { "userId", userId.ToString() }
                 };
                 await _queueService.PublishAsync("ocr_queue", payload);
-                _logger.LogInformation($"Message successfully sent to queue");
 
                 return docModel;  // 201 Created
             }
@@ -158,7 +159,7 @@ namespace PaperlessREST.Services
             finally
             {
                 // Delete temp file after upload
-                System.IO.File.Delete(tempPath);
+                File.Delete(tempPath);
             }
         }
 
@@ -182,9 +183,14 @@ namespace PaperlessREST.Services
 
             try
             {
+                // Remove from search index
+                await _searchIndexService.RemoveIndexAsync(docModel.Id);
+
+                // Remove from document storage
                 string storageFileName = _CreateStorageFilename(userId, docModel.FileName);
                 await _documentStorage.DeleteFileAsync(storageFileName);
 
+                // Remove from database
                 _context.Documents.Remove(docModel);
                 await _context.SaveChangesAsync();
 

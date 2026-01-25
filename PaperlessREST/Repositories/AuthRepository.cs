@@ -9,21 +9,21 @@ using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 
-namespace PaperlessREST.Services
+namespace PaperlessREST.Repositories
 {
-    public interface IAuthService
+    public interface IAuthRepository
     {
         public Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto);
         public Task<AuthResponseDto> LoginAsync(LoginDto loginDto);
     }
 
-    public class AuthService : IAuthService
+    public class AuthRepository : IAuthRepository
     {
         private readonly ApplicationDBContext _context;
         private readonly IConfiguration _configuration;
-        private readonly ILogger<AuthService> _logger;
+        private readonly ILogger<AuthRepository> _logger;
 
-        public AuthService(ApplicationDBContext context, IConfiguration configuration, ILogger<AuthService> logger)
+        public AuthRepository(ApplicationDBContext context, IConfiguration configuration, ILogger<AuthRepository> logger)
         {
             _context = context;
             _configuration = configuration;

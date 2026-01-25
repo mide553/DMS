@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
+using PaperlessREST.Repositories;
 using PaperlessREST.Exceptions;
-using PaperlessREST.Services;
 using PaperlessModels.Models;
 using PaperlessModels.DTOs;
 
@@ -22,12 +22,12 @@ namespace PaperlessREST.Controllers
     [Authorize]
     public class DocumentController : ControllerBase, IDocumentController
     {
-        private readonly IDocumentService _documentService;
+        private readonly IDocumentRepository _documentRepository;
         private readonly ILogger<DocumentController> _logger;
 
-        public DocumentController(IDocumentService documentService, ILogger<DocumentController> logger)
+        public DocumentController(IDocumentRepository documentRepository, ILogger<DocumentController> logger)
         {
-            _documentService = documentService;
+            _documentRepository = documentRepository;
             _logger = logger;
         }
 
@@ -46,11 +46,11 @@ namespace PaperlessREST.Controllers
         {
             try
             {
-            int userId = GetUserId();
-            List<OwnDocumentDto> docs = await _documentService.GetAllDocumentsAsync(userId);
+                int userId = GetUserId();
+                List<OwnDocumentDto> docs = await _documentRepository.GetAllDocumentsAsync(userId);
 
-            return Ok(docs);    // 200 Ok
-        }
+                return Ok(docs);    // 200 Ok
+            }
             catch (UnauthorizedAccessException)
             {
                 return Unauthorized();  // 401 Unauthorized
@@ -74,7 +74,7 @@ namespace PaperlessREST.Controllers
             try
             {
                 int userId = GetUserId();
-                DocumentDto doc = await _documentService.GetDocumentByIdAsync(id, userId);
+                DocumentDto doc = await _documentRepository.GetDocumentByIdAsync(id, userId);
                 
                 return Ok(doc); // 200 Ok
             }
@@ -109,7 +109,7 @@ namespace PaperlessREST.Controllers
             try
             {
                 int userId = GetUserId();
-                List<DocumentDto> docs = await _documentService.SearchDocumentAsync(searchText, userId);
+                List<DocumentDto> docs = await _documentRepository.SearchDocumentAsync(searchText, userId);
                 
                 return Ok(docs);   // 200 Ok
             }
@@ -123,7 +123,7 @@ namespace PaperlessREST.Controllers
                 return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
             }
         }
-
+        
         [HttpPost("upload")]
         public async Task<IActionResult> UploadDocument(IFormFile file)
         {
@@ -143,7 +143,7 @@ namespace PaperlessREST.Controllers
             try
             {
                 int userId = GetUserId();
-                Document doc = await _documentService.UploadDocumentAsync(file, userId);
+                Document doc = await _documentRepository.UploadDocumentAsync(file, userId);
 
                 return CreatedAtAction(nameof(GetDocumentById), new { id = doc.Id }, doc);  // 201 Created
             }
@@ -155,7 +155,7 @@ namespace PaperlessREST.Controllers
             {
                 return Conflict($"File with name {file.FileName} already exists");  // 409 Conflict
             }
-            catch (DocumentUploadException ex)
+            catch (DocumentUploadException)
             {
                 return StatusCode(500, "An error occurred while uploading the document");   // 500 Internal Server Error
             }
@@ -178,7 +178,7 @@ namespace PaperlessREST.Controllers
             try
             {
                 int userId = GetUserId();
-                await _documentService.DeleteDocumentAsync(id, userId);
+                await _documentRepository.DeleteDocumentAsync(id, userId);
                 
                 return NoContent();     // 204 No Content
             }
@@ -219,7 +219,7 @@ namespace PaperlessREST.Controllers
             try
             {
                 int userId = GetUserId();
-                DocumentDto doc = await _documentService.UpdateDocumentAsync(id, docDto, userId);
+                DocumentDto doc = await _documentRepository.UpdateDocumentAsync(id, docDto, userId);
 
                 // Return updated Document as DTO Object
                 return Ok(doc); // 200 Ok

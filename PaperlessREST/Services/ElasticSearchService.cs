@@ -6,7 +6,8 @@ namespace PaperlessREST.Services
 {
     public interface ISearchIndexService
     {
-        Task<List<IndexedDocument>> SearchAsync(string searchText, int userId);
+        public Task<List<IndexedDocument>> SearchAsync(string searchText, int userId);
+        public Task RemoveIndexAsync(int documentId);
     }
 
     public class ElasticSearchService : ISearchIndexService
@@ -54,10 +55,25 @@ namespace PaperlessREST.Services
             if (!searchResponse.IsValidResponse)
             {
                 _logger.LogError($"Error searching for documents: {searchResponse.DebugInformation}");
-                throw new Exception("Elasticsearch query failed");  // TODO rename Exception
+                throw new DocumentSearchException();
             }
 
             return searchResponse.Documents.ToList();
+        }
+        
+        public async Task RemoveIndexAsync(int documentId)
+        {
+            var response = await _client.DeleteAsync<IndexedDocument>(documentId, i => i
+                .Index(_indexName)
+            );
+
+            if (!response.IsValidResponse)
+            {
+                _logger.LogError($"Could not remove document with id {documentId}");
+                throw new IndexRemoveException();
+            }
+
+            _logger.LogInformation($"Document with id {documentId} removed from {_indexName}");
         }
     }
 }

@@ -5,21 +5,21 @@ using PaperlessModels.Models;
 using PaperlessREST.Data;
 using PaperlessREST.Exceptions;
 
-namespace PaperlessREST.Services
+namespace PaperlessREST.Repositories
 {
-    public interface IUserService
+    public interface IUserRepository
     {
         public Task<List<UserResponseDto>> GetAllUsersAsync();
         public Task DeleteUserAsync(int id);
     }
 
-    public class UserService : IUserService
+    public class UserRepository : IUserRepository
     {
         private readonly ApplicationDBContext _context;
         private readonly IMapper _mapper;
-        private readonly ILogger<UserService> _logger;
+        private readonly ILogger<UserRepository> _logger;
 
-        public UserService(ApplicationDBContext dbContext, IMapper mapper, ILogger<UserService> logger)
+        public UserRepository(ApplicationDBContext dbContext, IMapper mapper, ILogger<UserRepository> logger)
         {
             _context = dbContext;
             _mapper = mapper;

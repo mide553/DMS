@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using PaperlessModels.DTOs;
+using PaperlessREST.Repositories;
 using PaperlessREST.Exceptions;
-using PaperlessREST.Services;
 
 namespace PaperlessREST.Controllers
 {
@@ -15,12 +15,12 @@ namespace PaperlessREST.Controllers
     [Route("api/auth")]
     public class AuthController : ControllerBase, IAuthController
     {
-        private readonly IAuthService _authService;
+        private readonly IAuthRepository _authRepository;
         private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(IAuthRepository authRepository, ILogger<AuthController> logger)
         {
-            _authService = authService;
+            _authRepository = authRepository;
             _logger = logger;
         }
 
@@ -29,7 +29,7 @@ namespace PaperlessREST.Controllers
         {
             try
             {
-                AuthResponseDto auth = await _authService.RegisterAsync(registerDto);
+                AuthResponseDto auth = await _authRepository.RegisterAsync(registerDto);
             
                 return Ok(auth);    // 200 Ok
             }
@@ -59,7 +59,7 @@ namespace PaperlessREST.Controllers
         {
             try
             {
-                AuthResponseDto auth = await _authService.LoginAsync(loginDto);
+                AuthResponseDto auth = await _authRepository.LoginAsync(loginDto);
 
                 return Ok(auth);    // 200 Ok
             }

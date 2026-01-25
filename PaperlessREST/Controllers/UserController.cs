@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using PaperlessModels.DTOs;
+using PaperlessREST.Repositories;
 using PaperlessREST.Exceptions;
-using PaperlessREST.Services;
 
 namespace PaperlessREST.Controllers
 {
@@ -15,19 +15,19 @@ namespace PaperlessREST.Controllers
     [Route("api/users")]
     public class UserController : ControllerBase, IUserController
     {
-        private readonly IUserService _userService;
+        private readonly IUserRepository _userRepository;
         private readonly ILogger<UserController> _logger;
 
-        public UserController(IUserService userService, ILogger<UserController> logger)
+        public UserController(IUserRepository userRepository, ILogger<UserController> logger)
         {
-            _userService = userService;
+            _userRepository = userRepository;
             _logger = logger;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAllUsers()
         {
-            List<UserResponseDto> users = await _userService.GetAllUsersAsync();
+            List<UserResponseDto> users = await _userRepository.GetAllUsersAsync();
 
             return Ok(users);   // 200 Ok
         }
@@ -43,7 +43,7 @@ namespace PaperlessREST.Controllers
 
             try
             {
-                await _userService.DeleteUserAsync(id);
+                await _userRepository.DeleteUserAsync(id);
 
                 return NoContent(); // 204 No Content
             }

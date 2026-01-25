@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using PaperlessREST;
 using PaperlessREST.Data;
+using PaperlessREST.Repositories;
 using PaperlessREST.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -94,14 +95,14 @@ builder.Services.AddCors(options =>
     });
 });
 
-// DocumentService
-builder.Services.AddScoped<IDocumentService, DocumentService>();
+// DocumentRepository
+builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
 
-// AuthService
-builder.Services.AddScoped<IAuthService, AuthService>();
+// AuthRepository
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 
-// UserService
-builder.Services.AddScoped<IUserService, UserService>();
+// UserRepository
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 // AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));

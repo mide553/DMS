@@ -1,6 +1,7 @@
 using PaperlessREST.Data;
 using PaperlessREST.Exceptions;
 using PaperlessREST.Services;
+using PaperlessREST.Repositories;
 using PaperlessModels.DTOs;
 using System.Text;
 using System.Text.Json;
@@ -79,10 +80,10 @@ namespace PaperlessREST
         {
             try
             {
-                // Create new DI scope for scoped service DocumentService
+                // Create new DI scope for scoped service DocumentRepository
                 using (var scope = _serviceProvider.CreateScope())
                 {
-                    var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+                    var documentRepository = scope.ServiceProvider.GetRequiredService<IDocumentRepository>();
                     var context = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
 
                     // Get document from database directly to get userId
@@ -95,7 +96,7 @@ namespace PaperlessREST
                     }
 
                     // Get document to update
-                    DocumentDto currDoc = await documentService.GetDocumentByIdAsync(id, document.UserId);
+                    DocumentDto currDoc = await documentRepository.GetDocumentByIdAsync(id, document.UserId);
 
                     // Add summary to document
                     DocumentDto doc = new DocumentDto
@@ -107,8 +108,7 @@ namespace PaperlessREST
                         Summary = summary
                     };
 
-                    await documentService.UpdateDocumentAsync(id, doc, document.UserId);
-                    _logger.LogInformation($"Saved summary to document {id}");
+                    await documentRepository.UpdateDocumentAsync(id, doc, document.UserId);
                 }
             }
             catch (Exception ex)

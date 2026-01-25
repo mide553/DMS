@@ -78,12 +78,14 @@ namespace PaperlessREST.Services
                     // Acknowledge message (deletes from queue)
                     await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                 }
-                catch
+                catch (Exception ex)
                 {
                     await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
-                    throw new Exception("Error while handling message");
+                    throw new MessageHandlingException(ex);
                 }
             };
+
+            _logger.LogInformation($"Worker ({handler.ToString()}) subscribed to queue ({queueName})");
 
             // Consume message from Queue
             await _channel.BasicConsumeAsync(

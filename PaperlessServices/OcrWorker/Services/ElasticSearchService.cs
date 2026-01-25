@@ -48,8 +48,6 @@ namespace OcrWorker.Services
 
         public async Task IndexAsync(IndexedDocument document)
         {
-            _logger.LogInformation($"Indexing document {document.DocumentId}");
-
             await CreateIndexIfNotExistsAsync(_indexName);
 
             var response = await _client.IndexAsync(document, i => i
