@@ -223,16 +223,28 @@ class Dashboard {
     renderDocuments() {
         const documentsGrid = document.getElementById('documentsGrid');
         const noDocuments = document.getElementById('noDocuments');
+        const noSearchResults = document.getElementById('noSearchResults');
 
         if (!documentsGrid || !noDocuments) return;
 
+        const hasSearchTerm = document.getElementById('searchInput')?.value.trim() !== '';
+
         if (this.filteredDocuments.length === 0) {
             documentsGrid.style.display = 'none';
-            noDocuments.style.display = 'block';
+
+            // Show different message based on whether user is searching
+            if (hasSearchTerm && this.documents.length > 0) {
+                noDocuments.style.display = 'none';
+                if (noSearchResults) noSearchResults.style.display = 'block';
+            } else {
+                if (noSearchResults) noSearchResults.style.display = 'none';
+                noDocuments.style.display = 'block';
+            }
             return;
         }
 
         noDocuments.style.display = 'none';
+        if (noSearchResults) noSearchResults.style.display = 'none';
         documentsGrid.style.display = 'grid';
 
         documentsGrid.innerHTML = this.filteredDocuments.map(doc => this.createDocumentCard(doc)).join('');
