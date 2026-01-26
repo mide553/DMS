@@ -1,8 +1,8 @@
-﻿using Moq;
-using AutoMapper;
+﻿using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Moq;
 using PaperlessModels.DTOs;
 using PaperlessModels.Models;
 using PaperlessREST.Data;
@@ -235,7 +235,7 @@ public class DocumentRepositoryMockTests
     public async Task UpdateDocumentAsync_WrongDocument_ThrowsNotFound()
     {
         var docModel = new Document { Id = 1, FileName = "Test.pdf", UserId = 2 };
-        
+
         _db.Documents.Add(docModel);
         await _db.SaveChangesAsync();
 
