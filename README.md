@@ -168,10 +168,11 @@ tagging and full text search (ElasticSearch).
    ```
 
 ## Project Architecture
-<img width="1021" height="671" alt="image" src="https://github.com/user-attachments/assets/6e794cc4-5d17-4050-8b26-3a0a62ccabf8" />
+<img width="1021" height="671" alt="Project Architecture" src="https://github.com/user-attachments/assets/6e794cc4-5d17-4050-8b26-3a0a62ccabf8" />
 
 ## Responsibility-Layers
-<img width="747" height="920" alt="image" src="https://private-user-images.githubusercontent.com/146781097/540317185-4b33bfa9-954b-4b0e-8b87-87781052662a.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjkzOTEyNDksIm5iZiI6MTc2OTM5MDk0OSwicGF0aCI6Ii8xNDY3ODEwOTcvNTQwMzE3MTg1LTRiMzNiZmE5LTk1NGItNGIwZS04Yjg3LTg3NzgxMDUyNjYyYS5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwMTI2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDEyNlQwMTI5MDlaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1mMDZlMjNmMmM0YjIyZWFlOGYwMmE3MjhiOTc5M2NkMDA2NTUyMWIzMmFjNzk4OWRiYjFjYmFkNjllMDhhMzc2JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.lnnxDG4Q0EzTs3cMFB0pUFn83BIrdYWPamFcCsPipKY" />
+<img width="922" height="961" alt="Responsibility-Layers drawio" src="https://github.com/user-attachments/assets/ea7f6872-e7f2-4a79-8460-cef7c64225ce" />
+
 
 ## Use Cases
 
