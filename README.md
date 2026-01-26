@@ -65,9 +65,12 @@ tagging and full text search (ElasticSearch).
 **Current Access Points:**
 - **Web UI:** http://localhost:8080 (Login required)
 - **REST API:** http://localhost:5000/api/documents (Auth required)
-- **Database:** PostgreSQL on localhost:5432
-- **Swagger:** http://localhost:5000/swagger/index.html
-- **RabbitMQ:** http://localhost:15672/
+- **Swagger:** http://localhost:5000/swagger/index.html (Interactive API documentation with JWT support)
+- **PostgreSQL Database:** localhost:5432 (credentials in .env)
+- **RabbitMQ Management:** http://localhost:15672 (username/password from .env)
+- **MinIO Console:** http://localhost:9001 (Object storage management)
+- **ElasticSearch:** http://localhost:9200 (Full-text search engine)
+- **Kibana:** http://localhost:5601 (ElasticSearch visualization)
 
 ## Quick Start
 
@@ -79,7 +82,6 @@ tagging and full text search (ElasticSearch).
       ```bash
       docker-compose -f docker-compose.yml up -d
       ```
-   
    
 2. **Update Database:**
    ```bash
@@ -129,22 +131,38 @@ tagging and full text search (ElasticSearch).
    - Test all endpoints interactively
 
 
-4. **Access the RabbitMQ:**
+4. **Access RabbitMQ Management Console:**
    - Open http://localhost:15672/ in your browser
-   - Enter credentials
+   - Enter credentials from .env file (RABBITMQ_USER / RABBITMQ_PASSWORD)
+   - View queues, messages, and worker connections
 
 
-5. **Testing the Batch Process**:
+5. **Access MinIO Object Storage:**
+   - Open http://localhost:9001 in your browser
+   - Login with credentials from .env file (MINIO_ROOT_USER / MINIO_ROOT_PASSWORD)
+   - View uploaded document files in buckets
+   - Monitor storage usage and performance
 
-  1. Copy sample XML files to the batch input volume:
+
+6. **Access ElasticSearch:**
+   - ElasticSearch API: http://localhost:9200
+
+
+7. **Access Kibana Dashboard:**
+   - Open http://localhost:5601 in your browser
+   - Explore document search analytics
+
+
+8. **Testing the Batch Process:**
+   - Copy sample XML files to the batch input volume:
    ```bash
    docker cp PaperlessServices/BatchProcessor/access-log-2026-01-12.xml BatchProcessor:/data/input/
    ```
-  2. Check the BatchProcessor logs:
+  - Check the BatchProcessor logs:
    ```bash
    docker logs BatchProcessor
    ```
-  3. Query the database to verify access statistics:
+  - Query the database to verify access statistics:
    ```sql
    SELECT "Id", "FileName", "AccessCount", "LastAccessDate" FROM "Documents" WHERE "AccessCount" > 0;
    ```
@@ -152,6 +170,8 @@ tagging and full text search (ElasticSearch).
 ## Project Architecture
 <img width="1021" height="671" alt="image" src="https://github.com/user-attachments/assets/6e794cc4-5d17-4050-8b26-3a0a62ccabf8" />
 
+## Responsibility-Layers
+<img width="1021" height="671" alt="image" src="https://private-user-images.githubusercontent.com/146781097/540317185-4b33bfa9-954b-4b0e-8b87-87781052662a.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjkzOTEyNDksIm5iZiI6MTc2OTM5MDk0OSwicGF0aCI6Ii8xNDY3ODEwOTcvNTQwMzE3MTg1LTRiMzNiZmE5LTk1NGItNGIwZS04Yjg3LTg3NzgxMDUyNjYyYS5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwMTI2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDEyNlQwMTI5MDlaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1mMDZlMjNmMmM0YjIyZWFlOGYwMmE3MjhiOTc5M2NkMDA2NTUyMWIzMmFjNzk4OWRiYjFjYmFkNjllMDhhMzc2JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.lnnxDG4Q0EzTs3cMFB0pUFn83BIrdYWPamFcCsPipKY" />
 
 ## Use Cases
 
@@ -178,16 +198,16 @@ tagging and full text search (ElasticSearch).
 - OCR worker processes documents asynchronously (currently stub implementation)
 - Each user can only see their own uploaded documents
 
-### 3. Real-time Document Search and Management
+### 3. Document Management and Dashboard
 **Actor**: Authenticated Knowledge Worker
 **Current Implementation**:
 - Access web dashboard showing only user's own documents in grid layout
-- Use real-time search to filter personal documents by name or file type
+- Real-time client-side filtering by document name or file type
 - Click on documents to view detailed information on separate detail page
 - Edit document metadata through modal forms
 - Delete documents with confirmation dialogs
 - All changes immediately reflected in PostgreSQL database
-- User cannot access or modify documents belonging to other users
+- Role-based access control - users can only manage their own documents
 
 ### 4. REST API Integration for External Systems
 **Actor**: Developer
@@ -217,5 +237,39 @@ tagging and full text search (ElasticSearch).
 - Database schema includes:
   - `AccessCount`: Cumulative number of document accesses
   - `LastAccessDate`: Timestamp of last access statistics update
+
+### 6. OCR Processing and Text Extraction
+**Actor**: System / Background Worker
+**Current Implementation**:
+- When a document is uploaded, a message is sent to RabbitMQ queue
+- OcrWorker service listens to the queue for new document notifications
+- Worker retrieves document from MinIO object storage
+- Tesseract OCR extracts text content from document images
+- Extracted text is indexed in ElasticSearch for full-text search capabilities
+- Process runs asynchronously without blocking user interactions
+- Supports multiple document formats and languages
+
+### 7. AI-Powered Document Summarization
+**Actor**: System / Background Worker
+**Current Implementation**:
+- After OCR processing, document is queued for AI summarization
+- GenAIWorker service consumes messages from RabbitMQ
+- Worker sends document text to Gemini API for analysis
+- AI generates intelligent summary of document content
+- Summary is stored in PostgreSQL database linked to document
+- Users can view AI-generated summaries in document details
+- Configurable via GEMINI_API_KEY environment variable
+
+### 8. Advanced Full-Text Search with ElasticSearch
+**Actor**: Authenticated User
+**Current Implementation**:
+- ElasticSearch indexes OCR-extracted text and document metadata
+- Search inside document content (not just filenames)
+- Query across multiple documents for specific words or phrases
+- Advanced filtering by file type, date, tags, and other criteria
+- Search results ranked by relevance score
+- Supports fuzzy matching and complex search queries
+- Kibana dashboard available for search analytics and visualization (http://localhost:5601)
+- Complements basic dashboard filtering with deep content search
 
 
