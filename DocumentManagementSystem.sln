@@ -15,8 +15,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PaperlessServices.Tests", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GenAIWorker", "PaperlessServices\GenAIWorker\GenAIWorker.csproj", "{B58E0124-1A57-4019-82FE-A9E084551AC7}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PaperlessServices", "PaperlessServices", "{0DC91997-7103-4C47-9174-865194290647}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BatchProcessor", "PaperlessServices\BatchProcessor\BatchProcessor.csproj", "{407CDDDA-4C4D-4F9D-815B-FF2F5A2E2A21}"
 EndProject
 Global
