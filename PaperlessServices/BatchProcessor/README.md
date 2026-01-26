@@ -50,5 +50,26 @@ Edit `appsettings.json` to configure:
 
 ## Sample Files
 
-One sample XML file provided:
-- `sample-access-log-2026-01-12.xml`
+Sample XML file provided:
+- `access-log-2026-01-12.xml`
+
+**Testing the Batch Process**:
+1. Copy sample XML files to the batch input volume:
+   ```bash
+   docker cp PaperlessServices/BatchProcessor/access-log-2026-01-12.xml BatchProcessor:/data/input/
+   ```
+
+2. Check the BatchProcessor logs:
+   ```bash
+   docker logs BatchProcessor
+   ```
+
+3. Query the database to verify access statistics:
+   ```sql
+   SELECT "Id", "FileName", "AccessCount", "LastAccessDate" FROM "Documents" WHERE "AccessCount" > 0;
+   ```
+
+4. Verify archived files:
+   ```bash
+   docker exec BatchProcessor ls -la /data/archive
+   ```

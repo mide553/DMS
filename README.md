@@ -134,6 +134,21 @@ tagging and full text search (ElasticSearch).
    - Enter credentials
 
 
+5. **Testing the Batch Process**:
+
+  1. Copy sample XML files to the batch input volume:
+   ```bash
+   docker cp PaperlessServices/BatchProcessor/access-log-2026-01-12.xml BatchProcessor:/data/input/
+   ```
+  2. Check the BatchProcessor logs:
+   ```bash
+   docker logs BatchProcessor
+   ```
+  3. Query the database to verify access statistics:
+   ```sql
+   SELECT "Id", "FileName", "AccessCount", "LastAccessDate" FROM "Documents" WHERE "AccessCount" > 0;
+   ```
+
 ## Project Architecture
 <img width="1021" height="671" alt="image" src="https://github.com/user-attachments/assets/6e794cc4-5d17-4050-8b26-3a0a62ccabf8" />
 
@@ -203,33 +218,4 @@ tagging and full text search (ElasticSearch).
   - `AccessCount`: Cumulative number of document accesses
   - `LastAccessDate`: Timestamp of last access statistics update
 
-**XML Format**:
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<AccessLog date="2026-01-13">
-  <Document id="1" accessCount="15" />
-  <Document id="2" accessCount="8" />
-  <Document id="3" accessCount="23" />
-</AccessLog>
-```
 
-**Testing the Batch Process**:
-1. Copy sample XML files to the batch input volume:
-   ```bash
-   docker cp PaperlessServices/BatchProcessor/sample-access-log-2026-01-12.xml BatchProcessor:/data/input/
-   ```
-
-2. Check the BatchProcessor logs:
-   ```bash
-   docker logs BatchProcessor
-   ```
-
-3. Query the database to verify access statistics:
-   ```sql
-   SELECT Id, FileName, AccessCount, LastAccessDate FROM Documents WHERE AccessCount > 0;
-   ```
-
-4. Verify archived files:
-   ```bash
-   docker exec BatchProcessor ls -la /data/archive
-   ```
