@@ -75,7 +75,7 @@ namespace PaperlessREST.Controllers
             {
                 int userId = GetUserId();
                 DocumentDto doc = await _documentRepository.GetDocumentByIdAsync(id, userId);
-
+                
                 return Ok(doc); // 200 Ok
             }
             catch (UnauthorizedAccessException)
@@ -110,7 +110,7 @@ namespace PaperlessREST.Controllers
             {
                 int userId = GetUserId();
                 List<DocumentDto> docs = await _documentRepository.SearchDocumentAsync(searchText, userId);
-
+                
                 return Ok(docs);   // 200 Ok
             }
             catch (UnauthorizedAccessException)
@@ -123,7 +123,7 @@ namespace PaperlessREST.Controllers
                 return StatusCode(500, "An unexpected error occurred"); // 500 Internal Server Error
             }
         }
-
+        
         [HttpPost("upload")]
         public async Task<IActionResult> UploadDocument(IFormFile file)
         {
@@ -179,7 +179,7 @@ namespace PaperlessREST.Controllers
             {
                 int userId = GetUserId();
                 await _documentRepository.DeleteDocumentAsync(id, userId);
-
+                
                 return NoContent();     // 204 No Content
             }
             catch (UnauthorizedAccessException)
@@ -230,7 +230,7 @@ namespace PaperlessREST.Controllers
             }
             catch (ForbiddenActionException)
             {
-                return Forbid();    // 403 Forbidden
+                return Forbid();        // 403 Forbidden
             }
             catch (NotFoundException)
             {
