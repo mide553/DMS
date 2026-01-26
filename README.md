@@ -216,7 +216,7 @@ tagging and full text search (ElasticSearch).
 **Testing the Batch Process**:
 1. Copy sample XML files to the batch input volume:
    ```bash
-   docker cp PaperlessServices/BatchProcessor/sample-access-log-2026-01-13.xml BatchProcessor:/data/input/
+   docker cp PaperlessServices/BatchProcessor/sample-access-log-2026-01-12.xml BatchProcessor:/data/input/
    ```
 
 2. Check the BatchProcessor logs:

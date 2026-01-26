@@ -32,7 +32,7 @@ Edit `appsettings.json` to configure:
 ```json
 {
   "BatchProcessor": {
-    "Schedule": "0 1 * * *",           // Cron expression (1:00 AM daily)
+    "Schedule": "0 1 * * *",            // Cron expression (1:00 AM daily)
     "RunOnStartup": true,               // Run immediately on startup (for testing)
     "InputFolder": "/data/input",       // Folder to read XML files from
     "FilePattern": "access-log-*.xml",  // File pattern to match
@@ -50,25 +50,5 @@ Edit `appsettings.json` to configure:
 
 ## Sample Files
 
-Two sample XML files are provided:
-- `sample-access-log-2026-01-13.xml`
+One sample XML file provided:
 - `sample-access-log-2026-01-12.xml`
-
-## Running Locally
-
-1. Ensure PostgreSQL database is running
-2. Update connection string in `appsettings.json`
-3. Run the service:
-   ```bash
-   dotnet run
-   ```
-
-## Running with Docker
-
-The service is integrated into the docker-compose setup and will run automatically.
-
-## Database Schema
-
-The service updates the following fields in the `Documents` table:
-- `AccessCount` - Cumulative count of document accesses
-- `LastAccessDate` - Timestamp of last access update
