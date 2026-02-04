@@ -7,6 +7,10 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Copy our nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/
 
+# Cache busting - this ensures the COPY layer below is never cached
+ARG CACHEBUST=1
+RUN echo "Cache bust: $CACHEBUST"
+
 # Copy the web application files to nginx html directory
 COPY src/ /usr/share/nginx/html/
 

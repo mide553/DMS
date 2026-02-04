@@ -7,17 +7,48 @@ class Dashboard {
     }
 
     init() {
+        // Check authentication
+        auth.checkAuth();
+
+        // Display user info
+        const username = auth.getUsername();
+        const userInfoElement = document.getElementById('userInfo');
+        if (userInfoElement && username) {
+            userInfoElement.textContent = `Welcome, ${username}`;
+        }
+
+        // Bind logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => auth.logout());
+        }
+
         this.bindEvents();
         this.loadDocuments();
     }
 
     bindEvents() {
-        const searchInput = document.getElementById('searchInput');
-        const searchBtn = document.getElementById('searchBtn');
+        const filenameSearchInput = document.getElementById('filenameSearchInput');
+        const contentSearchInput = document.getElementById('contentSearchInput');
+        const contentSearchBtn = document.getElementById('contentSearchBtn');
 
-        if (searchInput && searchBtn) {
-            searchInput.addEventListener('input', () => this.filterDocuments());
-            searchBtn.addEventListener('click', () => this.filterDocuments());
+        // Filename search - real-time filtering
+        if (filenameSearchInput) {
+            filenameSearchInput.addEventListener('input', () => this.filterByFilename());
+        }
+
+        // Content search - on button click
+        if (contentSearchBtn) {
+            contentSearchBtn.addEventListener('click', () => this.searchByContent());
+        }
+
+        // Allow Enter key to search content
+        if (contentSearchInput) {
+            contentSearchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.searchByContent();
+                }
+            });
         }
 
         const addDocumentBtn = document.getElementById('addDocumentBtn');
@@ -183,8 +214,8 @@ class Dashboard {
         }
     }
 
-    filterDocuments() {
-        const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    filterByFilename() {
+        const searchTerm = document.getElementById('filenameSearchInput')?.value.toLowerCase() || '';
 
         if (!searchTerm) {
             this.filteredDocuments = [...this.documents];
@@ -204,19 +235,53 @@ class Dashboard {
         this.renderDocuments();
     }
 
+    async searchByContent() {
+        const searchTerm = document.getElementById('contentSearchInput')?.value.trim() || '';
+
+        try {
+            if (!searchTerm) {
+                this.filteredDocuments = [...this.documents];
+            } else {
+                // Use Elasticsearch API for content search
+                this.filteredDocuments = await documentService.searchDocuments(searchTerm);
+            }
+            this.renderDocuments();
+        } catch (error) {
+            console.error('Content search failed:', error);
+            utils.showError('errorMessage', error.message);
+        }
+    }
+
     renderDocuments() {
         const documentsGrid = document.getElementById('documentsGrid');
         const noDocuments = document.getElementById('noDocuments');
+        const noSearchResults = document.getElementById('noSearchResults');
 
         if (!documentsGrid || !noDocuments) return;
 
+        const filenameInput = document.getElementById('filenameSearchInput');
+        const contentInput = document.getElementById('contentSearchInput');
+        const hasFilenameSearch = filenameInput && filenameInput.value.trim() !== '';
+        const hasContentSearch = contentInput && contentInput.value.trim() !== '';
+        const hasAnySearch = hasFilenameSearch || hasContentSearch;
+        const hasDocuments = this.documents && this.documents.length > 0;
+
         if (this.filteredDocuments.length === 0) {
             documentsGrid.style.display = 'none';
-            noDocuments.style.display = 'block';
+
+            // Show different message based on whether user is searching
+            if (hasAnySearch && hasDocuments) {
+                noDocuments.style.display = 'none';
+                if (noSearchResults) noSearchResults.style.display = 'block';
+            } else {
+                if (noSearchResults) noSearchResults.style.display = 'none';
+                noDocuments.style.display = 'block';
+            }
             return;
         }
 
         noDocuments.style.display = 'none';
+        if (noSearchResults) noSearchResults.style.display = 'none';
         documentsGrid.style.display = 'grid';
 
         documentsGrid.innerHTML = this.filteredDocuments.map(doc => this.createDocumentCard(doc)).join('');
@@ -296,10 +361,22 @@ class Dashboard {
                 uploadBtn.textContent = 'Uploading...';
             }
 
+            const token = auth.getToken();
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch('/api/documents/upload', {
                 method: 'POST',
+                headers: headers,
                 body: formData
             });
+
+            if (response.status === 401) {
+                auth.logout();
+                return;
+            }
 
             if (!response.ok) {
                 const errorText = await response.text();

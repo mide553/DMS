@@ -1,20 +1,22 @@
-﻿using PaperlessREST.Exceptions;
-using RabbitMQ.Client;
+﻿using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
 using System.Text;
 using System.Text.Json;
+using PaperlessREST.Exceptions;
 
 namespace PaperlessREST.Services
 {
     public interface IMessageQueueService
     {
-        Task PublishAsync(int id, string message);
+        Task PublishAsync(string queueName, Dictionary<string, string> payload);
+        Task SubscribeAsync(string queueName, IMessageQueueHandler handler);
     }
 
     public class RabbitMQService : IMessageQueueService, IAsyncDisposable
     {
         private readonly IConnection _connection;
         private readonly IChannel _channel;
-        private readonly ILogger _logger;
+        private readonly ILogger<RabbitMQService> _logger;
 
         public RabbitMQService(IConfiguration config, ILogger<RabbitMQService> logger)
         {
@@ -30,10 +32,8 @@ namespace PaperlessREST.Services
             _logger = logger;
         }
 
-        public async Task PublishAsync(int id, string fileName)
+        public async Task PublishAsync(string queueName, Dictionary<string, string> payload)
         {
-            string queueName = "ocr_queue";
-
             // Declare Queue
             await _channel.QueueDeclareAsync(
                 queueName,
@@ -43,13 +43,6 @@ namespace PaperlessREST.Services
             );
 
             // Publish message
-            var payload = new Dictionary<string, string>
-            {
-                { "id", id.ToString() },
-                { "filename", fileName }
-
-            };
-
             var json = JsonSerializer.Serialize(payload);
             var body = Encoding.UTF8.GetBytes(json);
 
@@ -62,6 +55,44 @@ namespace PaperlessREST.Services
             );
 
             _logger.LogInformation($"Message in queue ({queueName}) ready to be processed");
+        }
+
+        public async Task SubscribeAsync(string queueName, IMessageQueueHandler handler)
+        {
+            // Declare Queue
+            await _channel.QueueDeclareAsync(
+                queue: queueName,
+                durable: true,
+                exclusive: false,
+                autoDelete: false
+            );
+
+            // Create Consumer
+            var consumer = new AsyncEventingBasicConsumer(_channel);
+            consumer.ReceivedAsync += async (sender, ea) =>
+            {
+                try
+                {
+                    await handler.HandleMessageAsync(ea.Body.ToArray());
+
+                    // Acknowledge message (deletes from queue)
+                    await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                }
+                catch (Exception ex)
+                {
+                    await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
+                    throw new MessageHandlingException(ex);
+                }
+            };
+
+            _logger.LogInformation($"Worker ({handler.ToString()}) subscribed to queue ({queueName})");
+
+            // Consume message from Queue
+            await _channel.BasicConsumeAsync(
+                queue: queueName,
+                autoAck: false,
+                consumer: consumer
+            );
         }
 
         public async ValueTask DisposeAsync()

@@ -10,7 +10,7 @@ namespace PaperlessREST.Services
         public Task DeleteFileAsync(string documentName);
         public Task<bool> FileExistsAsync(string documentName);
     }
-    
+
     public class MinIOService : IDocumentStorageService
     {
         private readonly IMinioClient _client;
@@ -53,8 +53,6 @@ namespace PaperlessREST.Services
         {
             try
             {
-                _logger.LogInformation($"Deleting file {documentName} from MinIO...");
-
                 await _client.RemoveObjectAsync(new RemoveObjectArgs()
                     .WithBucket(_bucketName)
                     .WithObject(documentName));

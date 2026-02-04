@@ -1,157 +1,121 @@
-using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
+using PaperlessREST.Data;
+using PaperlessREST.Exceptions;
+using PaperlessREST.Services;
+using PaperlessREST.Repositories;
+using PaperlessModels.DTOs;
 using System.Text;
 using System.Text.Json;
-using PaperlessModels.DTOs;
-using PaperlessREST.Services;
-using PaperlessREST.Exceptions;
 
 namespace PaperlessREST
 {
-    public interface IWorker
+    public interface IMessageQueueHandler
     {
+        public Task HandleMessageAsync(byte[] messageBytes);
         public Task ProcessDocumentAsync(int id, string summary);
     }
 
-    public class Worker : BackgroundService, IWorker, IAsyncDisposable
+    public class Worker : BackgroundService, IMessageQueueHandler
     {
-        private readonly IConnection _connection;
-        private readonly IChannel _channel;
+        private readonly IMessageQueueService _messageQueueService;
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<Worker> _logger;
+        private readonly string _queueName = "result_queue";
 
-        public Worker(IServiceProvider serviceProvider, IConfiguration config, ILogger<Worker> logger)
+        public Worker(IMessageQueueService messageQueueService, IServiceProvider serviceProvider, ILogger<Worker> logger)
         {
-            var factory = new ConnectionFactory
-            {
-                HostName = config["RABBITMQ_HOST"] ?? throw new MissingConfigurationItemException("RabbitMQ Host"),
-                UserName = config["RABBITMQ_USER"] ?? throw new MissingConfigurationItemException("RabbitMQ User"),
-                Password = config["RABBITMQ_PASSWORD"] ?? throw new MissingConfigurationItemException("RabbitMQ Password")
-            };
-
-            _connection = factory.CreateConnectionAsync("PaperlessREST-Connection").GetAwaiter().GetResult();
-            _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
+            _messageQueueService = messageQueueService;
             _serviceProvider = serviceProvider;
-
             _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Declare Queue
-            string queueName = "result_queue";
-            await _channel.QueueDeclareAsync(
-                queue: queueName,
-                durable: true,
-                exclusive: false,
-                autoDelete: false
-            );
+            // Subscribe to RabbitMQ
+            await _messageQueueService.SubscribeAsync(_queueName, this);
 
-            // Create Consumer
-            var consumer = new AsyncEventingBasicConsumer(_channel);
-            consumer.ReceivedAsync += async (model, ea) =>
-            {
-                try
-                {
-                    // Get message
-                    var json = Encoding.UTF8.GetString(ea.Body.ToArray());
-                    var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
-
-                    if (!message.TryGetValue("id", out var idString) ||
-                    !int.TryParse(idString, out int id))
-                    {
-                        throw new InvalidMessageException("id");
-                    }
-
-                    if (!message.TryGetValue("summary", out var summary) ||
-                        string.IsNullOrWhiteSpace(summary))
-                    {
-                        throw new InvalidMessageException("summary");
-                    }
-
-                    _logger.LogInformation($"Received summary for document {id}");
-
-                    try
-                    {
-                        // Save summary
-                        await ProcessDocumentAsync(id, summary);
-                
-                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new UpdateSummaryException(ex);
-                    }
-                }
-                catch (InvalidMessageException ex)
-                {
-                    _logger.LogError(ex, "Invalid message received - discarding");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                }
-                catch (UpdateSummaryException ex)
-                {
-                    _logger.LogError(ex, "Failed to update document summary");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Unexpected error");
-                    await _channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false);
-                }
-            };
-
-            // Consume message from Queue
-            await _channel.BasicConsumeAsync(
-                queue: queueName,
-                autoAck: false,
-                consumer: consumer
-            );
-
+            // Keep running until cancellation
             await Task.Delay(Timeout.Infinite, stoppingToken);
+        }
+
+        public async Task HandleMessageAsync(byte[] messageBytes)
+        {
+            try
+            {
+                // Get message
+                var json = Encoding.UTF8.GetString(messageBytes);
+                var message = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+
+                if (!message.TryGetValue("id", out var idString) ||
+                    !int.TryParse(idString, out int id))
+                {
+                    throw new InvalidMessageException("id");
+                }
+
+                if (!message.TryGetValue("summary", out var summary) ||
+                    string.IsNullOrWhiteSpace(summary))
+                {
+                    throw new InvalidMessageException("summary");
+                }
+
+                _logger.LogInformation($"Received summary for document {id}");
+
+                // Save summary
+                await ProcessDocumentAsync(id, summary);
+            }
+            catch (InvalidMessageException ex)
+            {
+                _logger.LogError(ex, "Invalid message received - discarding");
+            }
+            catch (UpdateSummaryException ex)
+            {
+                _logger.LogError(ex, "Failed to update document summary");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error");
+            }
         }
 
         public async Task ProcessDocumentAsync(int id, string summary)
         {
             try
             {
-                // Create new DI scope for scoped service DocumentService
+                // Create new DI scope for scoped service DocumentRepository
                 using (var scope = _serviceProvider.CreateScope())
                 {
-                    var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+                    var documentRepository = scope.ServiceProvider.GetRequiredService<IDocumentRepository>();
+                    var context = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
+
+                    // Get document from database directly to get userId
+                    var document = await context.Documents.FindAsync(id);
+
+                    if (document == null)
+                    {
+                        _logger.LogWarning($"Document with ID {id} not found");
+                        return;
+                    }
 
                     // Get document to update
-                    DocumentDto currDoc = await documentService.GetDocumentByIdAsync(id);
-                    
+                    DocumentDto currDoc = await documentRepository.GetDocumentByIdAsync(id, document.UserId);
+
                     // Add summary to document
-                    DocumentDto doc = new DocumentDto 
-                    { 
+                    DocumentDto doc = new DocumentDto
+                    {
                         FileName = currDoc.FileName,
                         ByteSize = currDoc.ByteSize,
                         LastModified = currDoc.LastModified,
-                        Summary = summary 
+                        UserId = currDoc.UserId,
+                        Summary = summary
                     };
 
-                    await documentService.UpdateDocumentAsync(id, doc);
-
-                    _logger.LogInformation($"Saved summary to document {id}");
+                    await documentRepository.UpdateDocumentAsync(id, doc, document.UserId);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Worker encountered an error");
+                throw new UpdateSummaryException(ex);
             }
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            _logger.LogInformation("Stopping PaperlessREST worker...");
-            // Close channel
-            if (_channel is not null)
-                await _channel.CloseAsync();
-
-            // Close connection
-            if (_connection is not null)
-                await _connection.CloseAsync();
         }
     }
 }

@@ -7,6 +7,22 @@ class DocumentDetail {
     }
 
     init() {
+        // Check authentication
+        auth.checkAuth();
+
+        // Display user info
+        const username = auth.getUsername();
+        const userInfoElement = document.getElementById('userInfo');
+        if (userInfoElement && username) {
+            userInfoElement.textContent = `Welcome, ${username}`;
+        }
+
+        // Bind logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => auth.logout());
+        }
+
         this.documentId = utils.getUrlParameter('id');
 
         if (!this.documentId) {

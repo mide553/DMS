@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document Management System - Dashboard</title>
-    <link rel="stylesheet" href="css/style.css?v=6">
+    <link rel="stylesheet" href="css/style.css?v=11">
 </head>
 <body>
     <div class="container">
@@ -12,6 +12,8 @@
             <h1>Document Management System</h1>
             <nav>
                 <a href="index.html" class="nav-link active">Dashboard</a>
+                <span id="userInfo" style="margin-left: auto; color: #666;"></span>
+                <button id="logoutBtn" class="btn btn-secondary" style="margin-left: 15px;">Logout</button>
             </nav>
         </header>
 
@@ -20,9 +22,15 @@
                 <div class="dashboard-header">
                     <h2>All Documents</h2>
                     <div class="search-container">
-                        <label for="searchInput" style="display: none;">Search documents</label>
-                        <input type="text" id="searchInput" placeholder="Search documents...">
-                        <button id="searchBtn" class="btn btn-secondary">Search</button>
+                        <div class="search-box">
+                            <label for="filenameSearchInput" style="display: none;">Search by filename</label>
+                            <input type="text" id="filenameSearchInput" placeholder="Search by filename...">
+                        </div>
+                        <div class="search-box">
+                            <label for="contentSearchInput" style="display: none;">Search content</label>
+                            <input type="text" id="contentSearchInput" placeholder="Search content...">
+                            <button id="contentSearchBtn" class="btn btn-secondary">Search Content</button>
+                        </div>
                         <button id="addDocumentBtn" class="btn btn-primary">Add Document</button>
                     </div>
                 </div>
@@ -36,6 +44,10 @@
 
                 <div class="no-documents" id="noDocuments" style="display: none;">
                     <p>No documents found. <a href="#" id="addFirstDocument">Add your first document</a></p>
+                </div>
+
+                <div class="no-documents" id="noSearchResults" style="display: none;">
+                    <p>No documents match your search. Try a different search term.</p>
                 </div>
             </section>
         </main>
@@ -83,7 +95,7 @@
         </div>
     </div>
 
-    <script src="js/api.js?v=8"></script>
-    <script src="js/dashboard.js?v=8"></script>
+    <script src="js/api.js?v=9"></script>
+    <script src="js/dashboard.js?v=9"></script>
 </body>
 </html>

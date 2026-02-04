@@ -8,7 +8,7 @@ namespace OcrWorker.Services
     {
         public Task DownloadFileAsync(string documentName, string filePath);
     }
-    
+
     public class MinIOService : IDocumentStorageService
     {
         private readonly IMinioClient _client;
@@ -39,7 +39,8 @@ namespace OcrWorker.Services
                     .WithFile(filePath));
 
                 _logger.LogInformation($"Downloaded {documentName} from MinIO ({filePath})");
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 _logger.LogError(ex, $"Failed to download file from MinIO");
                 throw new MinioDocumentDownloadException(documentName, ex);

@@ -1,7 +1,7 @@
 ﻿namespace GenAIWorker.Exceptions
 {
-    public class EmptySummaryException : Exception
+    public class EmptyTextException : Exception
     {
-        public EmptySummaryException() : base($"Generated summary was empty") { }
+        public EmptyTextException() : base($"Text to summarize was empty") { }
     }
 }

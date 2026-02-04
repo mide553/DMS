@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PaperlessModels.Models
 {
@@ -6,10 +7,27 @@ namespace PaperlessModels.Models
     {
         [Key]
         public int Id { get; set; }
+
         [Required]
         public string FileName { get; set; }
-        public int ByteSize { get; set; }
+
+        public long ByteSize { get; set; }
+
         public string Summary { get; set; } = string.Empty;
+
         public DateTime LastModified { get; set; } = DateTime.UtcNow;
+
+        // Access statistics
+        public int? AccessCount { get; set; } = 0;
+
+        public DateTime? LastAccessDate { get; set; }
+
+        // Foreign key to User
+        [Required]
+        public int UserId { get; set; }
+
+        // Navigation property
+        [ForeignKey("UserId")]
+        public User User { get; set; } = null!;
     }
 }

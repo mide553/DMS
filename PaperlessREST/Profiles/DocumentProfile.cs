@@ -10,6 +10,8 @@ namespace PaperlessREST.Profiles
         {
             CreateMap<Document, DocumentDto>(); // Entity -> DTO
             CreateMap<DocumentDto, Document>(); // DTO -> Entity
+
+            CreateMap<Document, OwnDocumentDto>();  // Entity -> DTO
         }
     }
 }
