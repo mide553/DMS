@@ -14,26 +14,38 @@ namespace PaperlessREST.Services
 
     public class RabbitMQService : IMessageQueueService, IAsyncDisposable
     {
-        private readonly IConnection _connection;
-        private readonly IChannel _channel;
+        private IConfiguration _config;
+        private IConnection _connection;
+        private IChannel _channel;
         private readonly ILogger<RabbitMQService> _logger;
 
         public RabbitMQService(IConfiguration config, ILogger<RabbitMQService> logger)
         {
+            _config = config;
+            _logger = logger;
+        }
+
+        public async Task EnsureInitializedAsync()
+        {
+            if (_channel != null) return;
+
             var factory = new ConnectionFactory
             {
-                HostName = config["RABBITMQ_HOST"] ?? throw new MissingConfigurationItemException("RabbitMQ Host"),
-                UserName = config["RABBITMQ_USER"] ?? throw new MissingConfigurationItemException("RabbitMQ User"),
-                Password = config["RABBITMQ_PASSWORD"] ?? throw new MissingConfigurationItemException("RabbitMQ Password")
+                HostName = _config["RABBITMQ_HOST"] ?? throw new MissingConfigurationItemException("RabbitMQ Host"),
+                UserName = _config["RABBITMQ_USER"] ?? throw new MissingConfigurationItemException("RabbitMQ User"),
+                Password = _config["RABBITMQ_PASSWORD"] ?? throw new MissingConfigurationItemException("RabbitMQ Password")
             };
 
-            _connection = factory.CreateConnectionAsync("PaperlessREST-Connection").GetAwaiter().GetResult();
-            _channel = _connection.CreateChannelAsync().GetAwaiter().GetResult();
-            _logger = logger;
+            _connection = await factory.CreateConnectionAsync("PaperlessREST-Connection");
+            _channel = await _connection.CreateChannelAsync();
+
+            _logger.LogInformation("RabbitMQ initialized.");
         }
 
         public async Task PublishAsync(string queueName, Dictionary<string, string> payload)
         {
+            await EnsureInitializedAsync();
+
             // Declare Queue
             await _channel.QueueDeclareAsync(
                 queueName,
@@ -59,6 +71,8 @@ namespace PaperlessREST.Services
 
         public async Task SubscribeAsync(string queueName, IMessageQueueHandler handler)
         {
+            await EnsureInitializedAsync();
+
             // Declare Queue
             await _channel.QueueDeclareAsync(
                 queue: queueName,

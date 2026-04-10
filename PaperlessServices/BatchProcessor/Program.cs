@@ -1,6 +1,7 @@
 using BatchProcessor;
 using BatchProcessor.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 
 var builder = Host.CreateApplicationBuilder(args);
 

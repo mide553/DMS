@@ -36,10 +36,11 @@ public class DocumentRepositoryMockTests
         _db = new ApplicationDBContext(options);
 
         // AutoMapper (REAL config)
-        var mapperConfig = new MapperConfiguration(cfg =>
-        {
-            cfg.AddProfile<DocumentProfile>(); // your real mapping profile
-        });
+        var mapperConfigExp = new MapperConfigurationExpression();
+        mapperConfigExp.AddProfile<DocumentProfile>();
+        var loggerFactory = LoggerFactory.Create(builder => { });
+
+        var mapperConfig = new MapperConfiguration(mapperConfigExp, loggerFactory);
         _mapper = mapperConfig.CreateMapper();
 
         // Mocks
@@ -61,7 +62,7 @@ public class DocumentRepositoryMockTests
             _logger
         );
     }
-
+    
     [TearDown]
     public void TearDown()
     {

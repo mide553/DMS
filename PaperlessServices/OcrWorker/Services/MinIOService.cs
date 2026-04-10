@@ -1,5 +1,4 @@
 ﻿using Minio;
-using Minio.DataModel.Args;
 using OcrWorker.Exceptions;
 
 namespace OcrWorker.Services

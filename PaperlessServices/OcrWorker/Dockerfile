@@ -22,14 +22,12 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy csproj files first
-COPY ["PaperlessModels/PaperlessModels.csproj", "PaperlessModels/"]
-COPY ["PaperlessServices/OcrWorker/OcrWorker.csproj", "PaperlessServices/OcrWorker/"]
+COPY Directory.Packages.props .
+COPY ["PaperlessModels/", "PaperlessModels/"]
+COPY ["PaperlessServices/OcrWorker/", "PaperlessServices/OcrWorker/"]
 
 # Restore
 RUN dotnet restore "PaperlessServices/OcrWorker/OcrWorker.csproj"
-
-# Copy everything else
-COPY . .
 
 # Build
 WORKDIR "/src/PaperlessServices/OcrWorker"

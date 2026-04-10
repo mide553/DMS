@@ -1,4 +1,4 @@
-version: "3.8"
+version: "3.9"
 
 services:
   db:
@@ -106,8 +106,8 @@ services:
   genaiworker:
     container_name: GenAIWorker
     build:
-      context: ./PaperlessServices/GenAIWorker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: PaperlessServices/GenAIWorker/Dockerfile
     environment:
       RABBITMQ_HOST: ${RABBITMQ_HOST}
       RABBITMQ_USER: ${RABBITMQ_USER}

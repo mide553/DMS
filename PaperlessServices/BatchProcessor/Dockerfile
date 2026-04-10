@@ -4,16 +4,13 @@ WORKDIR /app
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy project files
-COPY ["PaperlessServices/BatchProcessor/BatchProcessor.csproj", "PaperlessServices/BatchProcessor/"]
-COPY ["PaperlessModels/PaperlessModels.csproj", "PaperlessModels/"]
+# Copy source code
+COPY Directory.Packages.props .
+COPY PaperlessServices/BatchProcessor/ PaperlessServices/BatchProcessor/
+COPY PaperlessModels/ PaperlessModels/
 
 # Restore dependencies
 RUN dotnet restore "PaperlessServices/BatchProcessor/BatchProcessor.csproj"
-
-# Copy source code
-COPY PaperlessServices/BatchProcessor/ PaperlessServices/BatchProcessor/
-COPY PaperlessModels/ PaperlessModels/
 
 # Build
 WORKDIR "/src/PaperlessServices/BatchProcessor"

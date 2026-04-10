@@ -1,0 +1,48 @@
+<Project>
+	<PropertyGroup>
+		<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+	</PropertyGroup>
+
+	
+	<ItemGroup>
+		<!-- Microsoft.Extensions -->
+		<PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+		<PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="8.0.11" />
+		<PackageVersion Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+		<PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
+
+		<!-- EntityFramework -->
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.25" />
+		<PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.0.25" />
+		<PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.11" />
+
+		<!-- Services -->
+		<PackageVersion Include="Elastic.Clients.Elasticsearch" Version="9.3.4" />
+		<PackageVersion Include="Minio" Version="5.0.2" />
+		<PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />
+		<PackageVersion Include="Tesseract" Version="5.2.0" />
+
+		<!-- Mapper -->
+		<PackageVersion Include="AutoMapper" Version="15.1.3" />
+
+		<!-- Auth -->
+		<PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.19" />
+		<PackageVersion Include="Swashbuckle.AspNetCore" Version="8.1.4" />
+		<PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+
+		<!-- Api -->
+		<PackageVersion Include="RestSharp" Version="114.0.0" />
+
+		<!-- Batch -->
+		<PackageVersion Include="NCrontab" Version="3.3.3" />
+
+		<!-- Testing -->
+		<PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.0" />
+		<PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+		<PackageVersion Include="Moq" Version="4.20.72" />
+		<PackageVersion Include="NUnit" Version="4.4.0" />
+    <PackageVersion Include="NUnit.Analyzers" Version="4.4.0" />
+    <PackageVersion Include="NUnit3TestAdapter" Version="4.6.0" />
+
+	</ItemGroup>
+</Project>

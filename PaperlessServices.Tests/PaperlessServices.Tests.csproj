@@ -9,15 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.2" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.9" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageReference Include="Moq" Version="4.20.72" />
-    <PackageReference Include="NUnit" Version="4.2.2" />
-    <PackageReference Include="NUnit.Analyzers" Version="4.4.0" />
-    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
-    <PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
-    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Moq" />
+	<PackageReference Include="NUnit" />
+	<PackageReference Include="NUnit.Analyzers" />
+	<PackageReference Include="NUnit3TestAdapter" />
+    <PackageReference Include="RabbitMQ.Client" />
+    <PackageReference Include="Tesseract" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,7 +27,6 @@
     <ProjectReference Include="..\PaperlessServices\BatchProcessor\BatchProcessor.csproj" />
     <ProjectReference Include="..\PaperlessServices\GenAIWorker\GenAIWorker.csproj" />
     <ProjectReference Include="..\PaperlessServices\OcrWorker\OcrWorker.csproj" />
-
   </ItemGroup>
 
  </Project>

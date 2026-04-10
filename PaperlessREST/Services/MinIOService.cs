@@ -1,6 +1,5 @@
 ﻿using PaperlessREST.Exceptions;
 using Minio;
-using Minio.DataModel.Args;
 
 namespace PaperlessREST.Services
 {
